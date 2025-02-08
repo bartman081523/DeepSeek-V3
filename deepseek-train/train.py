@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import math
-import pickle
+import json  # Import the json module
 from contextlib import nullcontext
 
 import numpy as np
@@ -38,6 +38,7 @@ block_size = 128 # Reduced block size, adjust.
 
 # --- Optimizer ---
 learning_rate = 6e-4
+#max_iters = 600000
 max_iters = 400       # Limit to 400 iterations for testing
 weight_decay = 1e-1
 beta1 = 0.9
@@ -62,8 +63,8 @@ def get_batch(split, train_data, val_data):
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     x, y = x.to(device), y.to(device)
-    print(f"get_batch - x shape: {x.shape}, x dtype: {x.dtype}, x device: {x.device}")  # Debug print
-    print(f"get_batch - y shape: {y.shape}, y dtype: {y.dtype}, y device: {y.device}")  # Debug print
+    #print(f"get_batch - x shape: {x.shape}, x dtype: {x.dtype}, x device: {x.device}")  # Debug print
+    #print(f"get_batch - y shape: {y.shape}, y dtype: {y.dtype}, y device: {y.device}")  # Debug print
     return x, y
 
 @torch.no_grad()
@@ -142,6 +143,17 @@ if __name__ == '__main__':
     config_module = importlib.import_module(f"configs.{config_name}")
     model_args = config_module.model_args  # Access ModelArgs
 
+     # Convert ModelArgs to a dictionary and add model_type
+    model_args_dict = model_args.__dict__
+    model_args_dict['model_type'] = 'deepseek_v3'  # Add model_type
+
+    # Save the configuration as JSON
+    config_json_path = os.path.join(out_dir, 'config.json')
+    if master_process:  # Only save from the master process
+       with open(config_json_path, 'w') as f:
+           json.dump(model_args_dict, f, indent=4)
+       print(f"Saved model configuration to {config_json_path}")
+
 
     # --- Model Initialization ---
     if init_from == 'scratch':
@@ -192,7 +204,7 @@ if __name__ == '__main__':
                 checkpoint = {
                     'model': model.module.state_dict() if ddp else model.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'model_args': model_args.__dict__,  # Save ModelArgs
+                    'model_args': model_args_dict,  # Save ModelArgs as a dict
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
                     'config': {},  # You might want to populate this
@@ -220,14 +232,14 @@ if __name__ == '__main__':
                 loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
 
                 # --- Debug Prints ---
-                print(f"Micro-step: {micro_step}")
-                print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
-                print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
-                print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
-                if torch.cuda.is_available():
-                    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
-                    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
-                    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
+                #print(f"Micro-step: {micro_step}")
+                #print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
+                #print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
+                #print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
+                #if torch.cuda.is_available():
+                #    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
+                #    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
+                #    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
                 # ----------------------
             scaled_loss = scaler.scale(loss) # Scale
             if accumulated_loss is None:

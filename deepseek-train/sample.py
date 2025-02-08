@@ -1,13 +1,11 @@
 import os
-import json
 import torch
 import torch.distributed as dist
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig  # Import AutoConfig
 from model import Transformer, ModelArgs
-import importlib
 from argparse import ArgumentParser
-from typing import List, Optional  # Import Optional
-
+from typing import List, Optional
+import json
 
 def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
     """Samples a token from the logits using temperature scaling and top-k filtering."""
@@ -20,20 +18,6 @@ def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
 
 @torch.inference_mode()
 def generate(model: Transformer, prompt_tokens: List[List[int]], max_new_tokens: int, eos_id: int, temperature: float = 1.0, top_k: Optional[int] = None) -> List[List[int]]:
-    """
-    Generates new tokens based on the given prompt tokens using the specified model.
-
-    Args:
-        model (Transformer): The transformer model used for token generation.
-        prompt_tokens (List[List[int]]): A list of lists containing the prompt tokens for each sequence.
-        max_new_tokens (int): The maximum number of new tokens to generate.
-        eos_id (int): The end-of-sequence token ID.
-        temperature (float, optional): The temperature value for sampling. Defaults to 1.0.
-        top_k (Optional[int], optional): The top-k value for sampling. Defaults to None.
-
-    Returns:
-        List[List[int]]: A list of lists containing the generated tokens for each sequence.
-    """
     prompt_lens = [len(t) for t in prompt_tokens]
     assert max(prompt_lens) <= model.max_seq_len, f"Prompt length exceeds model maximum sequence length (max_seq_len={model.max_seq_len})"
     total_len = min(model.max_seq_len, max_new_tokens + max(prompt_lens))
@@ -62,12 +46,10 @@ def generate(model: Transformer, prompt_tokens: List[List[int]], max_new_tokens:
         completion_tokens.append(toks)
     return completion_tokens
 
-
-
 def main():
     parser = ArgumentParser()
     parser.add_argument("--ckpt-path", type=str, required=True, help="Path to the checkpoint directory")
-    parser.add_argument("--config", type=str, required=True, help="Path to the model configuration file (e.g., configs/10m.py)")
+    parser.add_argument("--config", type=str, required=True, help="Path to the model configuration file (10m.json)")  # Now expects 10m.json
     parser.add_argument("--prompt", type=str, default="", help="Initial prompt for text generation")
     parser.add_argument("--max-new-tokens", type=int, default=100, help="Maximum number of tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.8, help="Temperature for sampling")
@@ -86,33 +68,46 @@ def main():
        device = 'cpu'
        print("No CUDA, using CPU")
 
-    # Handle distributed setup (if applicable)
-    if 'RANK' in os.environ:  # Check if running in a distributed environment
-        dist.init_process_group(backend="nccl")  # Or 'gloo' if NCCL isn't available
+     # Handle distributed setup (if applicable)
+    if 'RANK' in os.environ:
+        dist.init_process_group(backend="nccl")
         rank = dist.get_rank()
         world_size = dist.get_world_size()
         local_rank = int(os.environ['LOCAL_RANK'])
         torch.cuda.set_device(local_rank)
-        device = f'cuda:{local_rank}' # each process on their own cuda
+        device = f'cuda:{local_rank}'
     else:
         rank = 0
         world_size = 1
 
+    # --- Load Model Args (from 10m.json) ---
+    try:
+        with open(args.config, 'r') as f:
+            config = json.load(f)
+            model_args = ModelArgs(**config['model_args']) # Get args from the 'model_args' dictionary
+    except FileNotFoundError:
+        print(f"Error: Config file not found at {args.config}")
+        exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error: {args.config} is not a valid JSON file or is missing 'model_args': {e}")
+        exit(1)
 
-    # --- Load Model Args (from config file) ---
-    config_name = os.path.splitext(os.path.basename(args.config))[0]  # Extract config name
-    config_module = importlib.import_module(f"configs.{config_name}")
-    model_args = config_module.model_args  # Access ModelArgs
 
-    # --- Load Tokenizer (CRUCIAL: Use AutoTokenizer with the checkpoint directory) ---
-    # The tokenizer MUST be loaded from the same directory as the checkpoint.
-    # convert.py *should* have copied the tokenizer files there.
-    tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path)
+    # --- Load Tokenizer ---
+    try:
+        # First, try loading directly from ckpt_path.  This is the *correct* way,
+        # IF the tokenizer files are present.
+        tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path)
+    except (OSError, EnvironmentError) as e:
+        print(f"Failed to load tokenizer from checkpoint path: {e}")
+        print("CRITICAL ERROR: Cannot proceed without the correct tokenizer.")
+        exit(1)  # Exit, as we can't recover without the tokenizer.
 
-    # --- Create/Load Model ---
+    # --- Create Model ---
     model = Transformer(model_args).to(device)
 
-    # --- Load Model Weights (Corrected for distributed setup) ---
+
+     # --- Load Model Weights (Corrected for distributed setup) ---
     if world_size > 1:
        # Load the sharded checkpoint for the current process
        model_file = os.path.join(args.ckpt_path, f"model{rank}-mp{world_size}.safetensors")
@@ -132,8 +127,7 @@ def main():
 
     model.eval()  # Set the model to evaluation mode
 
-
-    # --- Prepare Prompt ---
+   # --- Prepare Prompt ---
     if args.interactive:
       messages = []
       while True:
@@ -175,4 +169,4 @@ def main():
 
 
 if __name__ == "__main__":
-   main()
+    main()

@@ -123,7 +123,7 @@ class Linear(nn.Module):
             self.bias = nn.Parameter(torch.empty(out_features, dtype=actual_dtype))  # Enforce dtype
         else:
             self.register_parameter("bias", None)
-        print(f"Linear __init__ - Weight dtype: {self.weight.dtype}, Bias dtype: {self.bias.dtype if self.bias is not None else None}")  # Debug print
+        #print(f"Linear __init__ - Weight dtype: {self.weight.dtype}, Bias dtype: {self.bias.dtype if self.bias is not None else None}")  # Debug print
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

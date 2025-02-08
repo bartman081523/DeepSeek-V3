@@ -28,10 +28,8 @@ wandb_log = False
 wandb_project = 'deepseek-train'
 wandb_run_name = 'deepseek'
 dataset = 'shakespeare'
-#gradient_accumulation_steps = 8
-gradient_accumulation_steps = 32
-#batch_size = 4
-batch_size = 1
+gradient_accumulation_steps = 8
+batch_size = 4
 block_size = 4096
 n_layers = 27
 n_dense_layers = 1
@@ -119,8 +117,6 @@ def get_lr(it, learning_rate, warmup_iters, lr_decay_iters, min_lr):
 # --- Main Training Script ---
 
 if __name__ == '__main__':
-
-    # --- Setup DDP ---
     ddp = int(os.environ.get('RANK', -1)) != -1
     if ddp:
         init_process_group(backend=backend)
@@ -145,31 +141,14 @@ if __name__ == '__main__':
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-
-    # --- Device Selection (with try-except) ---
-    try:
-        if torch.cuda.is_available():
-            device = 'cuda'
-            device_type = 'cuda'
-            # Attempt to allocate a dummy tensor to check for CUDA availability *before* initializing the model
-            torch.empty((1,), device=device)
-        else:
-            device = 'cpu'
-            device_type = 'cpu'
-    except RuntimeError as e:
-        if 'out of memory' in str(e).lower():
-            print("CUDA out of memory. Falling back to CPU.")
-            device = 'cpu'
-            device_type = 'cpu'
-        else:
-            raise  # Re-raise other RuntimeErrors
-
+    device_type = 'cuda' if 'cuda' in device else 'cpu'
     ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
     ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+
     # --- Data Loading ---
     data_dir = os.path.join('data', dataset)
-    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.int64, mode='r')
-    val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')
+    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.int64, mode='r')  # Load int64
+    val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')    # Load int64
 
     # --- Model Initialization ---
     if init_from == 'scratch':
@@ -203,31 +182,30 @@ if __name__ == '__main__':
             moe_inter_dim = moe_inter_dim,
             dtype=dtype,
         )
+
         model_args = ModelArgs(**model_args)
         model = Transformer(model_args)
-
     elif init_from == 'resume':
-        ckpt_path = os.path.join(out_dir, 'ckpt.pt')
-        checkpoint = torch.load(ckpt_path, map_location=device)
-        model_args = checkpoint['model_args']
-        model = Transformer(model_args)
-        state_dict = checkpoint['model']
-        unwanted_prefix = '_orig_mod.'
-        for k, v in list(state_dict.items()):
-            if k.startswith(unwanted_prefix):
-                state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
-        model.load_state_dict(state_dict)
-        iter_num = checkpoint.get('iter_num', 0)
-        best_val_loss = checkpoint.get('best_val_loss', 1e9)
+       ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+       checkpoint = torch.load(ckpt_path, map_location=device)
+       model_args = checkpoint['model_args']
+       model = Transformer(model_args)
+       state_dict = checkpoint['model']
+       unwanted_prefix = '_orig_mod.'
+       for k, v in list(state_dict.items()):
+          if k.startswith(unwanted_prefix):
+            state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
+       model.load_state_dict(state_dict)
+       iter_num = checkpoint.get('iter_num', 0)
+       best_val_loss = checkpoint.get('best_val_loss', 1e9)
 
-    model.to(device)  # Move model to the selected device
-
+    model.to(device)
 
     # --- Optimizer and Scaler ---
     scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, betas=(beta1, beta2), weight_decay=weight_decay)
     if init_from == 'resume':
-        optimizer.load_state_dict(checkpoint['optimizer'])
+       optimizer.load_state_dict(checkpoint['optimizer'])
     if compile:
         model = torch.compile(model)
     if ddp:
@@ -280,7 +258,7 @@ if __name__ == '__main__':
                 Y_flat = Y.view(-1)
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps
-            X, Y = get_batch('train', train_data, val_data)
+            X, Y = get_batch('train', train_data, val_data)  # Get a NEW batch *after* forward pass
             scaler.scale(loss).backward()
 
         if grad_clip != 0.0:

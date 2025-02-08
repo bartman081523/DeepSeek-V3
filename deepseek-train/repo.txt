@@ -10,7 +10,9 @@ This format ensures a clear and orderly presentation of both the structure and t
 Directory/File Tree Begins -->
 
 /
+├── __pycache__
 ├── configs
+│   ├── __pycache__
 │   ├── broken
 │   │   ├── 10m.py
 │   │   ├── 114m.py

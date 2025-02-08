@@ -1,0 +1,45 @@
+{
+  "os":  "Linux-6.12.12-lqx1-1-lqx-x86_64-with-glibc2.41",
+  "python":  "CPython 3.11.11",
+  "startedAt":  "2025-02-07T12:05:07.492484Z",
+  "args":  [
+    "config/train_gpt2.py"
+  ],
+  "program":  "/run/media/julian/ML2/Python/nanoGPT/nanoGPT/train.py",
+  "codePath":  "train.py",
+  "git":  {
+    "remote":  "https://github.com/karpathy/nanoGPT",
+    "commit":  "93a43d9a5c22450bbf06e78da2cb6eeef084b717"
+  },
+  "email":  "chlorophyll273@gmail.com",
+  "root":  "/run/media/julian/ML2/Python/nanoGPT/nanoGPT",
+  "host":  "gb-arch",
+  "executable":  "/run/media/julian/ML2/Python/nanoGPT/nanoGPT/../.venv-nanogpt/bin/python",
+  "codePathLocal":  "train.py",
+  "cpu_count":  6,
+  "cpu_count_logical":  12,
+  "gpu":  "NVIDIA GeForce RTX 2060",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "103296053248",
+      "used":  "29744160768"
+    }
+  },
+  "memory":  {
+    "total":  "33579233280"
+  },
+  "cpu":  {
+    "count":  6,
+    "countLogical":  12
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 2060",
+      "memoryTotal":  "12884901888",
+      "cudaCores":  2176,
+      "architecture":  "Turing"
+    }
+  ],
+  "cudaVersion":  "12.8"
+}

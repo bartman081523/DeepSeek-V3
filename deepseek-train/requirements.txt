@@ -1,0 +1,4 @@
+numpy==2.2.2
+torch==2.6.0
+wandb==0.19.6
+transformers==4.48.3

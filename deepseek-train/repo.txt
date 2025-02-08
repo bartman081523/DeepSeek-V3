@@ -1,0 +1,99 @@
+import os
+import torch
+import tiktoken  # We'll use tiktoken directly
+from model import Transformer, ModelArgs  # Import your model and args
+import json  # For loading config
+import argparse #use argparse, as the original repo is using it
+
+def load_model_and_tokenizer(ckpt_path, config_path):
+    """Loads the model and tokenizer, handling potential distributed setup.
+
+    Args:
+        ckpt_path (str): Path to the checkpoint file.
+        config_path (str): Path to the JSON config file.
+
+    Returns:
+        tuple: A tuple containing the loaded model and tokenizer.
+    """
+
+    # Handle distributed setup (if applicable)
+    world_size = int(os.getenv("WORLD_SIZE", "1"))
+    rank = int(os.getenv("RANK", "0"))
+    if world_size > 1:
+        torch.distributed.init_process_group(backend="nccl")
+        torch.cuda.set_device(int(os.getenv("LOCAL_RANK", 0)))
+        device = f"cuda:{torch.cuda.current_device()}"
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Load model arguments from the JSON config
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+        model_args = ModelArgs(**config)
+
+    # !!! CRUCIAL: Ensure tokenizer matches the model's vocab_size !!!
+    tokenizer = tiktoken.get_encoding("gpt2")  # Use GPT-2 tokenizer
+    if model_args.vocab_size != 50257:
+        print("WARNING: Model vocab_size does not match gpt2 tokenizer size.")
+        print("You MUST retrain your model with vocab_size=50257 to use the gpt2 tokenizer,")
+        print("or change sample.py to load a tokenizer that matches the model.")
+        exit() #we are stopping the program, if there is a missmatch
+
+    # Instantiate the model
+    model = Transformer(model_args).to(device)
+    model.load_state_dict(torch.load(ckpt_path, map_location=device)['model'])  # Load weights
+    model.eval()  # Set to evaluation mode
+
+    return model, tokenizer
+
+
+
+@torch.no_grad()
+def generate_text(model, tokenizer, prompt, max_new_tokens=200, temperature=0.8, top_k=None):
+    """Generates text from a prompt using the given model and tokenizer.
+
+    Args:
+        model (Transformer): The loaded transformer model.
+        tokenizer (tiktoken.Encoding): The tokenizer.
+        prompt (str): The initial text prompt.
+        max_new_tokens (int): Maximum number of new tokens to generate.
+        temperature (float): Controls randomness of sampling (higher = more random).
+        top_k (int, optional): If set, only sample from top k most likely tokens.
+
+    Returns:
+        str: The generated text (including the prompt).
+    """
+
+    # Encode the prompt
+    input_ids = tokenizer.encode(prompt)
+    input_ids = torch.tensor(input_ids, dtype=torch.long, device=model.embed.weight.device).unsqueeze(0) #add the batch dimension
+
+    # Generate new tokens
+    generated_ids = model.generate(input_ids, max_new_tokens=max_new_tokens, temperature=temperature, top_k=top_k)
+
+
+    # Decode the generated tokens (including the prompt)
+    generated_text = tokenizer.decode(generated_ids[0].tolist())
+
+    return generated_text
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate text with a Transformer model.")
+    parser.add_argument("--ckpt_path", type=str, required=True, help="Path to the model checkpoint file (e.g., ckpt.pt).")
+    parser.add_argument("--config_path", type=str, required=True, help="Path to the model config JSON file (e.g., out-dir/params.json).")  # Changed to JSON
+    parser.add_argument("--prompt", type=str, default="", help="Initial text prompt (defaults to an empty string).")
+    parser.add_argument("--max_new_tokens", type=int, default=100, help="Maximum number of tokens to generate.")
+    parser.add_argument("--temperature", type=float, default=0.8, help="Temperature for sampling.")
+    parser.add_argument("--top_k", type=int, default=None, help="Top-k sampling (if None, sample from the full distribution).")
+    parser.add_argument("--num_samples", type=int, default=1, help="number of samples to generate")
+    args = parser.parse_args()
+
+
+    model, tokenizer = load_model_and_tokenizer(args.ckpt_path, args.config_path)
+
+    for _ in range(args.num_samples):
+        generated_text = generate_text(model, tokenizer, args.prompt, args.max_new_tokens, args.temperature, args.top_k)
+        print(generated_text)
+        print("-" * 20) # Separator between samples

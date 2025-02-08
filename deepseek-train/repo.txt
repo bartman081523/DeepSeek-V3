@@ -1,99 +1,1409 @@
-import os
+Repository Documentation
+This document provides a comprehensive overview of the repository's structure and contents.
+The first section, titled 'Directory/File Tree', displays the repository's hierarchy in a tree format.
+In this section, directories and files are listed using tree branches to indicate their structure and relationships.
+Following the tree representation, the 'File Content' section details the contents of each file in the repository.
+Each file's content is introduced with a '[File Begins]' marker followed by the file's relative path,
+and the content is displayed verbatim. The end of each file's content is marked with a '[File Ends]' marker.
+This format ensures a clear and orderly presentation of both the structure and the detailed contents of the repository.
+
+Directory/File Tree Begins -->
+
+/
+├── __pycache__
+├── configs
+│   ├── 10m.py
+│   ├── __pycache__
+│   └── broken
+│       ├── 114m.py
+│       ├── 20m.py
+│       ├── 33m.py
+│       ├── 55m.py
+│       ├── 850m.py
+│       └── 85m.py
+├── kernel.py
+├── model.py
+├── sample.py
+├── train.py
+
+<-- Directory/File Tree Ends
+
+File Content Begin -->
+[File Begins] configs/10m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=2,
+    n_dense_layers=2,
+    n_heads=4,
+    dim=64,       # Further reduced!
+    inter_dim=256,  # 4 * dim
+    vocab_size=102400, #YOUR VOCAB SIZE
+    max_seq_len=1024,
+    qk_nope_head_dim=16,
+    qk_rope_head_dim=16,
+    v_head_dim=16,
+    n_routed_experts=0,  # MoE disabled
+    n_shared_experts=0,
+    n_activated_experts=0,
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func="softmax",
+    route_scale=1.0,
+    q_lora_rank=0,       # No LoRA
+    kv_lora_rank=0,      # No LoRA
+    original_seq_len=4096,
+    rope_theta=10000.0,
+    rope_factor=1.0,
+    beta_fast=32,
+    beta_slow=1,
+    mscale=1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/10m.py
+
+[File Begins] configs/broken/114m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=6, # Number of layers
+    n_dense_layers=6,
+    n_heads=8,   # Number of heads
+    dim=512,    # Embedding dimension
+    inter_dim=4*512,   # Intermediate dimension
+    vocab_size=102400, # Your vocab_size
+    max_seq_len=4096,  # maximum context length
+    qk_nope_head_dim=64,
+    qk_rope_head_dim=64,
+    v_head_dim=64,
+    n_routed_experts=0,  # MoE disabled
+    n_shared_experts=0,   # MoE disabled
+    n_activated_experts=0,  # MoE disabled
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/broken/114m.py
+
+[File Begins] configs/broken/20m.py
+
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=2,
+    n_dense_layers=2,
+    n_heads=4,
+    dim=288,  # Adjusted
+    inter_dim=4*288,
+    vocab_size=102400, #YOUR VOCAB SIZE
+    max_seq_len=1024,  # Same as block_size
+    qk_nope_head_dim=32,
+    qk_rope_head_dim=32,
+    v_head_dim=32,
+    n_routed_experts=0, # MoE disabled
+    n_shared_experts=0,   # MoE disabled
+    n_activated_experts=0,
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+
+)
+
+[File Ends] configs/broken/20m.py
+
+[File Begins] configs/broken/33m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=2,
+    n_dense_layers=2,
+    n_heads=8,
+    dim=384,
+    inter_dim=4*384,
+    vocab_size=102400,
+    max_seq_len=1024,
+    qk_nope_head_dim=32,
+    qk_rope_head_dim=32,
+    v_head_dim=32,
+    n_routed_experts=0,
+    n_shared_experts=0,
+    n_activated_experts=0,
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/broken/33m.py
+
+[File Begins] configs/broken/55m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=2,
+    n_dense_layers=2,
+    n_heads=8,
+    dim=512, # Modified
+    inter_dim=4*512,
+    vocab_size=102400,  # Your vocab size
+    max_seq_len=4096,
+    qk_nope_head_dim=64, #modified
+    qk_rope_head_dim=64, #modified
+    v_head_dim=64, #modified
+    n_routed_experts=0,
+    n_shared_experts=0,
+    n_activated_experts=0,
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/broken/55m.py
+
+[File Begins] configs/broken/850m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=12,  # Increased layers
+    n_dense_layers=12,
+    n_heads=16,    # Increased heads
+    dim=1024,      # Increased dimension
+    inter_dim=4*1024,   # 4 * dim
+    vocab_size=102400, # YOUR VOCAB SIZE
+    max_seq_len=4096,   # Adjust as needed
+    qk_nope_head_dim=64,
+    qk_rope_head_dim=64,
+    v_head_dim=64,
+    n_routed_experts=0,  # MoE disabled
+    n_shared_experts=0,   # MoE disabled
+    n_activated_experts=0,  # MoE disabled
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/broken/850m.py
+
+[File Begins] configs/broken/85m.py
+from model import ModelArgs
+
+model_args = ModelArgs(
+    n_layers=6,  # More layers
+    n_dense_layers=6,
+    n_heads=8,
+    dim=384,  # Increased dim
+    inter_dim=4*384,
+    vocab_size=102400,  # Your vocab size
+    max_seq_len=4096,
+    qk_nope_head_dim=32,
+    qk_rope_head_dim=32,
+    v_head_dim=32,
+    n_routed_experts=0,
+    n_shared_experts=0,
+    n_activated_experts=0,
+    n_expert_groups = 1,
+    n_limited_groups = 1,
+    score_func = "softmax",
+    route_scale = 1.0,
+    q_lora_rank = 0,
+    kv_lora_rank = 0,
+    original_seq_len = 4096,
+    rope_theta = 10000.0,
+    rope_factor = 1.0,
+    beta_fast = 32,
+    beta_slow = 1,
+    mscale = 1.0,
+    dtype="bfloat16"
+)
+
+[File Ends] configs/broken/85m.py
+
+[File Begins] kernel.py
+from typing import Tuple
+
 import torch
-import tiktoken  # We'll use tiktoken directly
-from model import Transformer, ModelArgs  # Import your model and args
-import json  # For loading config
-import argparse #use argparse, as the original repo is using it
+import triton
+import triton.language as tl
+from triton import Config
 
-def load_model_and_tokenizer(ckpt_path, config_path):
-    """Loads the model and tokenizer, handling potential distributed setup.
+
+@triton.jit
+def act_quant_kernel(x_ptr, y_ptr, s_ptr, BLOCK_SIZE: tl.constexpr):
+    """
+    Quantizes the input tensor `x_ptr` and stores the result in `y_ptr` and the scaling factor in `s_ptr`.
 
     Args:
-        ckpt_path (str): Path to the checkpoint file.
-        config_path (str): Path to the JSON config file.
+        x_ptr (triton.Pointer): Pointer to the input tensor.
+        y_ptr (triton.Pointer): Pointer to the output tensor where quantized values will be stored.
+        s_ptr (triton.Pointer): Pointer to the output tensor where scaling factors will be stored.
+        BLOCK_SIZE (tl.constexpr): The size of the block to be processed by each program instance.
 
     Returns:
-        tuple: A tuple containing the loaded model and tokenizer.
+        None
     """
-
-    # Handle distributed setup (if applicable)
-    world_size = int(os.getenv("WORLD_SIZE", "1"))
-    rank = int(os.getenv("RANK", "0"))
-    if world_size > 1:
-        torch.distributed.init_process_group(backend="nccl")
-        torch.cuda.set_device(int(os.getenv("LOCAL_RANK", 0)))
-        device = f"cuda:{torch.cuda.current_device()}"
-    else:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Load model arguments from the JSON config
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-        model_args = ModelArgs(**config)
-
-    # !!! CRUCIAL: Ensure tokenizer matches the model's vocab_size !!!
-    tokenizer = tiktoken.get_encoding("gpt2")  # Use GPT-2 tokenizer
-    if model_args.vocab_size != 50257:
-        print("WARNING: Model vocab_size does not match gpt2 tokenizer size.")
-        print("You MUST retrain your model with vocab_size=50257 to use the gpt2 tokenizer,")
-        print("or change sample.py to load a tokenizer that matches the model.")
-        exit() #we are stopping the program, if there is a missmatch
-
-    # Instantiate the model
-    model = Transformer(model_args).to(device)
-    model.load_state_dict(torch.load(ckpt_path, map_location=device)['model'])  # Load weights
-    model.eval()  # Set to evaluation mode
-
-    return model, tokenizer
+    pid = tl.program_id(axis=0)
+    offs = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    x = tl.load(x_ptr + offs).to(tl.float32)
+    s = tl.max(tl.abs(x)) / 448.
+    y = x / s
+    y = y.to(y_ptr.dtype.element_ty)
+    tl.store(y_ptr + offs, y)
+    tl.store(s_ptr + pid, s)
 
 
-
-@torch.no_grad()
-def generate_text(model, tokenizer, prompt, max_new_tokens=200, temperature=0.8, top_k=None):
-    """Generates text from a prompt using the given model and tokenizer.
+def act_quant(x: torch.Tensor, block_size: int = 128) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Quantizes the input tensor `x` using block-wise quantization.
 
     Args:
-        model (Transformer): The loaded transformer model.
-        tokenizer (tiktoken.Encoding): The tokenizer.
-        prompt (str): The initial text prompt.
-        max_new_tokens (int): Maximum number of new tokens to generate.
-        temperature (float): Controls randomness of sampling (higher = more random).
-        top_k (int, optional): If set, only sample from top k most likely tokens.
+        x (torch.Tensor): The input tensor to be quantized. Must be contiguous and its last dimension size must be divisible by `block_size`.
+        block_size (int, optional): The size of the blocks to be used for quantization. Default is 128.
 
     Returns:
-        str: The generated text (including the prompt).
+        Tuple[torch.Tensor, torch.Tensor]: A tuple containing:
+            - The quantized tensor with dtype `torch.float8_e4m3fn`.
+            - A tensor of scaling factors with dtype `torch.float32`.
     """
-
-    # Encode the prompt
-    input_ids = tokenizer.encode(prompt)
-    input_ids = torch.tensor(input_ids, dtype=torch.long, device=model.embed.weight.device).unsqueeze(0) #add the batch dimension
-
-    # Generate new tokens
-    generated_ids = model.generate(input_ids, max_new_tokens=max_new_tokens, temperature=temperature, top_k=top_k)
-
-
-    # Decode the generated tokens (including the prompt)
-    generated_text = tokenizer.decode(generated_ids[0].tolist())
-
-    return generated_text
+    assert x.is_contiguous(), 'Input tensor must be contiguous'
+    assert x.size(-1) % block_size == 0, f'Last dimension size must be divisible by block_size (block_size={block_size})'
+    y = torch.empty_like(x, dtype=torch.float8_e4m3fn)
+    s = x.new_empty(*x.size()[:-1], x.size(-1) // block_size, dtype=torch.float32)
+    grid = lambda meta: (triton.cdiv(x.numel(), meta['BLOCK_SIZE']), )
+    act_quant_kernel[grid](x, y, s, BLOCK_SIZE=block_size)
+    return y, s
 
 
+@triton.jit
+def weight_dequant_kernel(x_ptr, s_ptr, y_ptr, M, N, BLOCK_SIZE: tl.constexpr):
+    """
+    Dequantizes weights using the provided scaling factors and stores the result.
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate text with a Transformer model.")
-    parser.add_argument("--ckpt_path", type=str, required=True, help="Path to the model checkpoint file (e.g., ckpt.pt).")
-    parser.add_argument("--config_path", type=str, required=True, help="Path to the model config JSON file (e.g., out-dir/params.json).")  # Changed to JSON
-    parser.add_argument("--prompt", type=str, default="", help="Initial text prompt (defaults to an empty string).")
-    parser.add_argument("--max_new_tokens", type=int, default=100, help="Maximum number of tokens to generate.")
-    parser.add_argument("--temperature", type=float, default=0.8, help="Temperature for sampling.")
-    parser.add_argument("--top_k", type=int, default=None, help="Top-k sampling (if None, sample from the full distribution).")
-    parser.add_argument("--num_samples", type=int, default=1, help="number of samples to generate")
+    Args:
+        x_ptr (tl.pointer): Pointer to the quantized weights.
+        s_ptr (tl.pointer): Pointer to the scaling factors.
+        y_ptr (tl.pointer): Pointer to the output buffer for dequantized weights.
+        M (int): Number of rows in the weight matrix.
+        N (int): Number of columns in the weight matrix.
+        BLOCK_SIZE (tl.constexpr): Size of the block for tiling.
+
+    Returns:
+        None
+    """
+    pid_m = tl.program_id(axis=0)
+    pid_n = tl.program_id(axis=1)
+    n = tl.cdiv(N, BLOCK_SIZE)
+    offs_m = pid_m * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    offs_n = pid_n * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    offs = offs_m[:, None] * N + offs_n[None, :]
+    mask = (offs_m[:, None] < M) & (offs_n[None, :] < N)
+    x = tl.load(x_ptr + offs, mask=mask).to(tl.float32)
+    s = tl.load(s_ptr + pid_m * n + pid_n)
+    y = x * s
+    tl.store(y_ptr + offs, y, mask=mask)
+
+
+def weight_dequant(x: torch.Tensor, s: torch.Tensor, block_size: int = 128) -> torch.Tensor:
+    """
+    Dequantizes the given weight tensor using the provided scale tensor.
+
+    Args:
+        x (torch.Tensor): The quantized weight tensor of shape (M, N).
+        s (torch.Tensor): The scale tensor of shape (M, N).
+        block_size (int, optional): The block size to use for dequantization. Defaults to 128.
+
+    Returns:
+        torch.Tensor: The dequantized weight tensor of the same shape as `x`.
+
+    Raises:
+        AssertionError: If `x` or `s` are not contiguous or if their dimensions are not 2.
+    """
+    assert x.is_contiguous() and s.is_contiguous(), 'Input tensors must be contiguous'
+    assert x.dim() == 2 and s.dim() == 2, 'Input tensors must have 2 dimensions'
+    M, N = x.size()
+    y = torch.empty_like(x, dtype=torch.get_default_dtype())
+    grid = lambda meta: (triton.cdiv(M, meta['BLOCK_SIZE']), triton.cdiv(N, meta['BLOCK_SIZE']))
+    weight_dequant_kernel[grid](x, s, y, M, N, BLOCK_SIZE=block_size)
+    return y
+
+
+fp8_gemm_configs = [
+    Config({'BLOCK_SIZE_M': block_m, 'BLOCK_SIZE_N': block_n, 'BLOCK_SIZE_K': 128}, num_stages=num_stages, num_warps=8)
+    for block_m in [16, 32, 64] for block_n in [32, 64, 128] for num_stages in [3, 4, 5, 6]
+]
+
+@triton.autotune(configs=fp8_gemm_configs, key=['N', 'K'])
+@triton.jit
+def fp8_gemm_kernel(a_ptr, b_ptr, c_ptr,
+                    a_s_ptr, b_s_ptr,
+                    M, N: tl.constexpr, K: tl.constexpr,
+                    BLOCK_SIZE_M: tl.constexpr,
+                    BLOCK_SIZE_N: tl.constexpr,
+                    BLOCK_SIZE_K: tl.constexpr):
+    """
+    Performs a matrix multiplication operation on FP8 matrices with scaling factors.
+
+    Args:
+        a_ptr (tl.tensor): Pointer to the first input matrix A.
+        b_ptr (tl.tensor): Pointer to the second input matrix B.
+        c_ptr (tl.tensor): Pointer to the output matrix C.
+        a_s_ptr (tl.tensor): Pointer to the scaling factors for matrix A.
+        b_s_ptr (tl.tensor): Pointer to the scaling factors for matrix B.
+        M (int): Number of rows in matrix A and C.
+        N (tl.constexpr): Number of columns in matrix B and C.
+        K (tl.constexpr): Number of columns in matrix A and rows in matrix B.
+        BLOCK_SIZE_M (tl.constexpr): Block size for the M dimension.
+        BLOCK_SIZE_N (tl.constexpr): Block size for the N dimension.
+        BLOCK_SIZE_K (tl.constexpr): Block size for the K dimension.
+
+    Returns:
+        None
+    """
+    pid_m = tl.program_id(axis=0)
+    pid_n = tl.program_id(axis=1)
+    k = tl.cdiv(K, BLOCK_SIZE_K)
+    offs_m = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)) % M
+    offs_n = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
+    offs_k = tl.arange(0, BLOCK_SIZE_K)
+    a_ptrs = a_ptr + offs_m[:, None] * K + offs_k[None, :]
+    b_ptrs = b_ptr + offs_n[None, :] * K + offs_k[:, None]
+    a_s_ptrs = a_s_ptr + offs_m * k
+    b_s_ptrs = b_s_ptr + (offs_n // BLOCK_SIZE_K) * k
+
+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
+    for i in range(k):
+        a = tl.load(a_ptrs, mask=offs_k[None, :] < K - i * BLOCK_SIZE_K, other=0.0)
+        b = tl.load(b_ptrs, mask=offs_k[:, None] < K - i * BLOCK_SIZE_K, other=0.0)
+        a_s = tl.load(a_s_ptrs)
+        b_s = tl.load(b_s_ptrs)
+        accumulator += tl.dot(a, b) * a_s[:, None] * b_s[None, :]
+        a_ptrs += BLOCK_SIZE_K
+        b_ptrs += BLOCK_SIZE_K
+        a_s_ptrs += 1
+        b_s_ptrs += 1
+    c = accumulator.to(c_ptr.dtype.element_ty)
+    offs_m = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
+    offs_n = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
+    c_ptrs = c_ptr + offs_m[:, None] * N + offs_n[None, :]
+    mask = (offs_m[:, None] < M) & (offs_n[None, :] < N)
+    tl.store(c_ptrs, c, mask=mask)
+
+
+def fp8_gemm(a: torch.Tensor, a_s: torch.Tensor, b: torch.Tensor, b_s: torch.Tensor):
+    """
+    Perform a matrix multiplication using FP8 precision.
+
+    Args:
+        a (torch.Tensor): The first input matrix, must be contiguous.
+        a_s (torch.Tensor): The scaling factor for the first input matrix, must be contiguous.
+        b (torch.Tensor): The second input matrix, must be contiguous.
+        b_s (torch.Tensor): The scaling factor for the second input matrix, must be contiguous.
+
+    Returns:
+        torch.Tensor: The result of the matrix multiplication.
+    """
+    assert a.is_contiguous() and b.is_contiguous(), 'Input tensors must be contiguous'
+    assert a_s.is_contiguous() and b_s.is_contiguous(), 'Scaling factor tensors must be contiguous'
+    K = a.size(-1)
+    M = a.numel() // K
+    N = b.size(0)
+    c = a.new_empty(*a.size()[:-1], N, dtype=torch.get_default_dtype())
+    grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']), triton.cdiv(N, META['BLOCK_SIZE_N']))
+    fp8_gemm_kernel[grid](a, b, c, a_s, b_s, M, N, K)
+    return c
+
+[File Ends] kernel.py
+
+[File Begins] model.py
+import math
+from dataclasses import dataclass
+from typing import Tuple, Optional, Literal
+
+import torch
+from torch import nn
+import torch.nn.functional as F
+import torch.distributed as dist
+
+from kernel import act_quant, weight_dequant, fp8_gemm
+
+
+world_size = 1
+rank = 0
+block_size = 128  # This will be overridden by the config, but it's good to have a default
+gemm_impl: Literal["bf16", "fp8"] = "bf16"
+attn_impl: Literal["naive", "absorb"] = "absorb"
+
+@dataclass
+class ModelArgs:
+    max_batch_size: int = 8
+    max_seq_len: int = 4096 * 4
+    dtype: Literal["bf16", "fp8"] = "bf16"
+    vocab_size: int = 102400
+    dim: int = 2048
+    inter_dim: int = 10944
+    moe_inter_dim: int = 1408
+    n_layers: int = 27
+    n_dense_layers: int = 1
+    n_heads: int = 16
+    # moe
+    n_routed_experts: int = 64
+    n_shared_experts: int = 2
+    n_activated_experts: int = 6
+    n_expert_groups: int = 1
+    n_limited_groups: int = 1
+    score_func: Literal["softmax", "sigmoid"] = "softmax"
+    route_scale: float = 1.
+    # mla
+    q_lora_rank: int = 0
+    kv_lora_rank: int = 512
+    qk_nope_head_dim: int = 128
+    qk_rope_head_dim: int = 64
+    v_head_dim: int = 128
+    # yarn
+    original_seq_len: int = 4096
+    rope_theta: float = 10000.0
+    rope_factor: float = 40
+    beta_fast: int = 32
+    beta_slow: int = 1
+    mscale: float = 1.
+
+
+class ParallelEmbedding(nn.Module):
+    def __init__(self, vocab_size: int, dim: int):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.dim = dim
+        assert vocab_size % world_size == 0, f"Vocabulary size must be divisible by world size (world_size={world_size})"
+        self.part_vocab_size = (vocab_size // world_size)
+        self.vocab_start_idx = rank * self.part_vocab_size
+        self.vocab_end_idx = self.vocab_start_idx + self.part_vocab_size
+        self.weight = nn.Parameter(torch.empty(self.part_vocab_size, self.dim, dtype=torch.bfloat16)) # Enforce bfloat16
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print(f"ParallelEmbedding - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug
+        if world_size > 1:
+            mask = (x < self.vocab_start_idx) | (x >= self.vocab_end_idx)
+            x = x - self.vocab_start_idx
+            x[mask] = 0
+        y = F.embedding(x, self.weight)
+        if world_size > 1:
+            y[mask] = 0
+            dist.all_reduce(y)
+        print(f"ParallelEmbedding - Output y shape: {y.shape}, y dtype: {y.dtype}")  # Debug
+        return y
+
+
+
+def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] = None) -> torch.Tensor:
+    print(f"linear - Input x dtype: {x.dtype}, weight dtype: {weight.dtype}, bias dtype: {bias.dtype if bias is not None else None}")  # Debug print
+    if weight.element_size() > 1:  # quantized
+        out = F.linear(x, weight, bias)
+        print(f"linear - Output out dtype (weight.element_size() > 1): {out.dtype}")
+        return out
+    elif gemm_impl == "bf16":
+        # Only dequantize and convert to float32 if the weight is NOT already float32
+        if weight.dtype != torch.float32:
+            weight = weight_dequant(weight, weight.scale)
+            weight = weight.to(torch.float32) #correct
+
+        # Ensure x is bfloat16
+        x = x.to(torch.bfloat16)
+        # Ensure bias is float32, if it exists
+        if bias is not None:
+            bias = bias.to(torch.float32)
+
+        out = F.linear(x, weight, bias)  # Now, x is bfloat16, weight is float32
+        print(f"linear - Output out dtype (gemm_impl == bf16): {out.dtype}") # Debug
+        return out
+    else:  # gemm_impl == "fp8"
+        x, scale = act_quant(x, block_size)
+        y = fp8_gemm(x, scale, weight, weight.scale)
+        if bias is not None:
+            y += bias
+        if y.dtype != torch.bfloat16:  # Keep consistent output dtype
+          y = y.to(torch.bfloat16)
+        print(f"linear - Output y dtype (gemm_impl == fp8): {y.dtype}")
+        return y
+
+
+class Linear(nn.Module):
+    dtype = torch.bfloat16  # Default dtype
+
+    def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype=None):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        actual_dtype = dtype or Linear.dtype  # Use provided dtype or default
+        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=actual_dtype))
+        if self.weight.element_size() == 1:
+            scale_out_features = (out_features + block_size - 1) // block_size
+            scale_in_features = (in_features + block_size - 1) // block_size
+            self.weight.scale = self.scale = nn.Parameter(torch.empty(scale_out_features, scale_in_features, dtype=torch.float32))
+        else:
+            self.register_parameter("scale", None)
+        if bias:
+            self.bias = nn.Parameter(torch.empty(out_features, dtype=actual_dtype))  # Enforce dtype
+        else:
+            self.register_parameter("bias", None)
+        #print(f"Linear __init__ - Weight dtype: {self.weight.dtype}, Bias dtype: {self.bias.dtype if self.bias is not None else None}")
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return linear(x, self.weight, self.bias)
+
+
+class ColumnParallelLinear(Linear):
+    def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype = None):
+        assert out_features % world_size == 0, f"Output features must be divisible by world size (world_size={world_size})"
+        self.part_out_features = out_features // world_size
+        # Crucially, we *force* the dtype here if it's the head.
+        # This ensures the output of the head is float32.
+        if out_features == 102400: # Check the number of output features
+            super().__init__(in_features, self.part_out_features, bias, dtype=torch.float32) # Force float32 for head
+        else:
+            super().__init__(in_features, self.part_out_features, bias, dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        y = linear(x, self.weight, self.bias)
+        return y
+
+
+class RowParallelLinear(Linear):
+    def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype = None):
+        assert in_features % world_size == 0, f"Input features must be divisible by world size (world_size={world_size})"
+        self.part_in_features = in_features // world_size
+        super().__init__(self.part_in_features, out_features, bias, dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        y = linear(x, self.weight)
+        if world_size > 1:
+            dist.all_reduce(y)
+        if self.bias is not None:
+            y += self.bias
+        return y
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.dim = dim
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim, dtype=torch.bfloat16))  # Enforce bfloat16
+
+    def forward(self, x: torch.Tensor):
+        print(f"RMSNorm - Input x shape: {x.shape}, x dtype: {x.dtype}, weight dtype: {self.weight.dtype}")  # Debug print
+        return F.rms_norm(x, (self.dim,), self.weight, self.eps)
+
+
+
+def precompute_freqs_cis(args: ModelArgs) -> torch.Tensor:
+    dim = args.qk_rope_head_dim
+    seqlen = args.max_seq_len
+    beta_fast = args.beta_fast
+    beta_slow = args.beta_slow
+    base = args.rope_theta
+    factor = args.rope_factor
+
+    def find_correction_dim(num_rotations, dim, base, max_seq_len):
+        return dim * math.log(max_seq_len / (num_rotations * 2 * math.pi)) / (2 * math.log(base))
+
+    def find_correction_range(low_rot, high_rot, dim, base, max_seq_len):
+        low = math.floor(find_correction_dim(low_rot, dim, base, max_seq_len))
+        high = math.ceil(find_correction_dim(high_rot, dim, base, max_seq_len))
+        return max(low, 0), min(high, dim-1)
+
+    def linear_ramp_factor(min, max, dim):
+        if min == max:
+            max += 0.001
+        linear_func = (torch.arange(dim, dtype=torch.float32, device='cuda') - min) / (max - min)
+        ramp_func = torch.clamp(linear_func, 0, 1)
+        return ramp_func
+
+    freqs = 1.0 / (base ** (torch.arange(0, dim, 2, dtype=torch.float32, device='cuda') / dim))
+    if seqlen > args.original_seq_len:
+        low, high = find_correction_range(beta_fast, beta_slow, dim, base, args.original_seq_len)
+        smooth = 1 - linear_ramp_factor(low, high, dim // 2)
+        freqs = freqs / factor * (1 - smooth) + freqs * smooth
+
+    t = torch.arange(seqlen, device='cuda')  # Always on CUDA
+    freqs = torch.outer(t, freqs)
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
+    return freqs_cis
+
+
+def apply_rotary_emb(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
+    dtype = x.dtype
+    x_len = x.shape[-1] // 2
+    x_real = x[..., :x_len]     # Get the real parts
+    x_imag = x[..., x_len:]    # Get the imaginary parts
+
+    freqs_cis = freqs_cis.view(1, x.size(1), 1, -1)
+    freqs_real = freqs_cis.real
+    freqs_imag = freqs_cis.imag
+
+    # Perform the complex multiplication manually:
+    rx = x_real * freqs_real - x_imag * freqs_imag  # (a+bi)(c+di) = (ac-bd) + (ad+bc)i
+    ix = x_real * freqs_imag + x_imag * freqs_real
+
+    # Concatenate back into the original shape
+    return torch.cat((rx, ix), dim=-1).to(dtype)
+
+
+class MLA(nn.Module):
+    def __init__(self, args: ModelArgs):
+        super().__init__()
+        self.dim = args.dim
+        self.n_heads = args.n_heads
+        self.n_local_heads = args.n_heads // world_size
+        self.q_lora_rank = args.q_lora_rank
+        self.kv_lora_rank = args.kv_lora_rank
+        self.qk_nope_head_dim = args.qk_nope_head_dim
+        self.qk_rope_head_dim = args.qk_rope_head_dim
+        self.qk_head_dim = args.qk_nope_head_dim + args.qk_rope_head_dim
+        self.v_head_dim = args.v_head_dim
+
+        if self.q_lora_rank == 0:
+            self.wq = ColumnParallelLinear(self.dim, self.n_heads * self.qk_head_dim)
+        else:
+            self.wq_a = Linear(self.dim, self.q_lora_rank)
+            self.q_norm = RMSNorm(self.q_lora_rank)
+            self.wq_b = ColumnParallelLinear(self.q_lora_rank, self.n_heads * self.qk_head_dim)
+        self.wkv_a = Linear(self.dim, self.kv_lora_rank + self.qk_rope_head_dim)
+        self.kv_norm = RMSNorm(self.kv_lora_rank)
+        self.wkv_b = ColumnParallelLinear(self.kv_lora_rank, self.n_heads * (self.qk_nope_head_dim + self.v_head_dim))
+        self.wo = RowParallelLinear(self.n_heads * self.v_head_dim, self.dim)
+        self.softmax_scale = self.qk_head_dim ** -0.5
+        if args.max_seq_len > args.original_seq_len:
+            mscale = 0.1 * args.mscale * math.log(args.rope_factor) + 1.0
+            self.softmax_scale = self.softmax_scale * mscale * mscale
+
+        if attn_impl == "naive":
+            self.register_buffer("k_cache", torch.zeros(args.max_batch_size, args.max_seq_len, self.n_local_heads, self.qk_head_dim, dtype=torch.bfloat16), persistent=False)
+            self.register_buffer("v_cache", torch.zeros(args.max_batch_size, args.max_seq_len, self.n_local_heads, self.v_head_dim, dtype=torch.bfloat16), persistent=False)
+        else:
+            self.register_buffer("kv_cache", torch.zeros(args.max_batch_size, args.max_seq_len, self.kv_lora_rank, dtype=torch.bfloat16), persistent=False)
+            self.register_buffer("pe_cache", torch.zeros(args.max_batch_size, args.max_seq_len, self.qk_rope_head_dim, dtype=torch.bfloat16), persistent=False)
+
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
+        bsz, seqlen, _ = x.size()
+        end_pos = start_pos + seqlen
+        print(f"MLA Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        if self.q_lora_rank == 0:
+            q = self.wq(x)
+        else:
+            q = self.wq_b(self.q_norm(self.wq_a(x)))
+        q = q.view(bsz, seqlen, self.n_local_heads, self.qk_head_dim)
+        q_nope, q_pe = torch.split(q, [self.qk_nope_head_dim, self.qk_rope_head_dim], dim=-1)
+        q_pe = apply_rotary_emb(q_pe, freqs_cis)
+        kv = self.wkv_a(x)
+        kv, k_pe = torch.split(kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1)
+        k_pe = apply_rotary_emb(k_pe.unsqueeze(2), freqs_cis)
+        if attn_impl == "naive":
+            q = torch.cat([q_nope, q_pe], dim=-1)
+            kv = self.wkv_b(self.kv_norm(kv))
+            kv = kv.view(bsz, seqlen, self.n_local_heads, self.qk_nope_head_dim + self.v_head_dim)
+            k_nope, v = torch.split(kv, [self.qk_nope_head_dim, self.v_head_dim], dim=-1)
+            k = torch.cat([k_nope, k_pe.expand(-1, -1, self.n_local_heads, -1)], dim=-1)
+            self.k_cache[:bsz, start_pos:end_pos] = k
+            self.v_cache[:bsz, start_pos:end_pos] = v
+            scores = torch.einsum("bshd,bthd->bsht", q, self.k_cache[:bsz, :end_pos]) * self.softmax_scale
+        else:
+            wkv_b = self.wkv_b.weight if self.wkv_b.scale is None else weight_dequant(self.wkv_b.weight, self.wkv_b.scale, block_size)
+            wkv_b = wkv_b.view(self.n_local_heads, -1, self.kv_lora_rank)
+            q_nope = torch.einsum("bshd,hdc->bshc", q_nope, wkv_b[:, :self.qk_nope_head_dim])
+            self.kv_cache[:bsz, start_pos:end_pos] = self.kv_norm(kv)
+            self.pe_cache[:bsz, start_pos:end_pos] = k_pe.squeeze(2)
+            scores = (torch.einsum("bshc,btc->bsht", q_nope, self.kv_cache[:bsz, :end_pos]) +
+                      torch.einsum("bshr,btr->bsht", q_pe, self.pe_cache[:bsz, :end_pos])) * self.softmax_scale
+        if mask is not None:
+            scores += mask.unsqueeze(1)
+        scores = scores.softmax(dim=-1, dtype=torch.float32).type_as(x)
+        if attn_impl == "naive":
+            x = torch.einsum("bsht,bthd->bshd", scores, self.v_cache[:bsz, :end_pos])
+        else:
+            x = torch.einsum("bsht,btc->bshc", scores, self.kv_cache[:bsz, :end_pos])
+            x = torch.einsum("bshc,hdc->bshd", x, wkv_b[:, -self.v_head_dim:])
+        x = self.wo(x.flatten(2))
+        print(f"MLA Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        return x
+
+
+class MLP(nn.Module):
+    def __init__(self, dim: int, inter_dim: int):
+        super().__init__()
+        self.w1 = ColumnParallelLinear(dim, inter_dim)
+        self.w2 = RowParallelLinear(inter_dim, dim)
+        self.w3 = ColumnParallelLinear(dim, inter_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print(f"MLP Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        out = self.w2(F.silu(self.w1(x)) * self.w3(x))
+        print(f"MLP Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+        return out
+
+
+
+class Gate(nn.Module):
+    # (Uses Linear, so dtype should be handled)
+    def __init__(self, args: ModelArgs):
+        super().__init__()
+        self.dim = args.dim
+        self.topk = args.n_activated_experts
+        self.n_groups = args.n_expert_groups
+        self.topk_groups = args.n_limited_groups
+        self.score_func = args.score_func
+        self.route_scale = args.route_scale
+        self.weight = nn.Parameter(torch.empty(args.n_routed_experts, args.dim, dtype=torch.bfloat16)) # Enforce bfloat16
+        self.bias = nn.Parameter(torch.empty(args.n_routed_experts, dtype=torch.bfloat16)) if self.dim == 7168 else None # Enforce bfloat16
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        print(f"Gate Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")
+        scores = linear(x, self.weight)
+        if self.score_func == "softmax":
+            scores = scores.softmax(dim=-1, dtype=torch.float32)
+        else:
+            scores = scores.sigmoid()
+        original_scores = scores
+        if self.bias is not None:
+            scores = scores + self.bias
+        if self.n_groups > 1:
+            scores = scores.view(x.size(0), self.n_groups, -1)
+            if self.bias is None:
+                group_scores = scores.amax(dim=-1)
+            else:
+                group_scores = scores.topk(2, dim=-1)[0].sum(dim=-1)
+            indices = group_scores.topk(self.topk_groups, dim=-1)[1]
+            mask = torch.zeros_like(scores[..., 0]).scatter_(1, indices, True)
+            scores = (scores * mask.unsqueeze(-1)).flatten(1)
+        indices = torch.topk(scores, self.topk, dim=-1)[1]
+        weights = original_scores.gather(1, indices)
+        if self.score_func == "sigmoid":
+            weights /= weights.sum(dim=-1, keepdim=True)
+        weights *= self.route_scale
+        return weights.type_as(x), indices
+
+
+class Expert(nn.Module):
+    def __init__(self, dim: int, inter_dim: int):
+        super().__init__()
+        self.w1 = Linear(dim, inter_dim)
+        self.w2 = Linear(inter_dim, dim)
+        self.w3 = Linear(dim, inter_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print(f"Expert Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        out = self.w2(F.silu(self.w1(x)) * self.w3(x))
+        print(f"Expert Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+        return out
+
+class MoE(nn.Module):
+    # (Uses Linear and Gate, so dtype should be handled)
+    def __init__(self, args: ModelArgs):
+        super().__init__()
+        self.dim = args.dim
+        assert args.n_routed_experts % world_size == 0, f"Number of experts must be divisible by world size (world_size={world_size})"
+        self.n_routed_experts = args.n_routed_experts
+        self.n_local_experts = args.n_routed_experts // world_size
+        self.n_activated_experts = args.n_activated_experts
+        self.experts_start_idx = rank * self.n_local_experts
+        self.experts_end_idx = self.experts_start_idx + self.n_local_experts
+        self.gate = Gate(args)
+        self.experts = nn.ModuleList([Expert(args.dim, args.moe_inter_dim) if self.experts_start_idx <= i < self.experts_end_idx else None
+                                      for i in range(self.n_routed_experts)])
+        self.shared_experts = MLP(args.dim, args.n_shared_experts * args.moe_inter_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print(f"MoE Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        shape = x.size()
+        x = x.view(-1, self.dim)
+        weights, indices = self.gate(x)
+        y = torch.zeros_like(x)
+        counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
+        for i in range(self.experts_start_idx, self.experts_end_idx):
+            if counts[i] == 0:
+                continue
+            expert = self.experts[i]
+            idx, top = torch.where(indices == i)
+            y[idx] += expert(x[idx]) * weights[idx, top, None]
+        z = self.shared_experts(x)
+        if world_size > 1:
+            dist.all_reduce(y)
+        out = (y + z).view(shape)
+        print(f"MoE Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+
+        return out
+
+
+class Block(nn.Module):
+    def __init__(self, layer_id: int, args: ModelArgs):
+        super().__init__()
+        self.attn = MLA(args) if args.q_lora_rank > 0 or args.kv_lora_rank > 0 else None
+        self.ffn = MLP(args.dim, args.inter_dim) if layer_id < args.n_dense_layers else None
+        self.attn_norm = RMSNorm(args.dim) if self.attn is not None else None
+        self.ffn_norm = RMSNorm(args.dim)
+
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
+        print(f"Block Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        if self.attn is not None:
+          x = x + self.attn(self.attn_norm(x), start_pos, freqs_cis, mask)
+        x = x + self.ffn(self.ffn_norm(x))
+        print(f"Block Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        return x
+
+
+class Transformer(nn.Module):
+    def __init__(self, args: ModelArgs):
+        global world_size, rank
+        world_size = dist.get_world_size() if dist.is_initialized() else 1
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        Linear.dtype = torch.float8_e4m3fn if args.dtype == "fp8" else torch.bfloat16  # Set default dtype for Linear layers.
+        super().__init__()
+        self.max_seq_len = args.max_seq_len
+        self.embed = ParallelEmbedding(args.vocab_size, args.dim)
+        self.layers = torch.nn.ModuleList()
+        for layer_id in range(args.n_layers):
+            self.layers.append(Block(layer_id, args))
+        self.norm = RMSNorm(args.dim)
+        self.head = ColumnParallelLinear(args.dim, args.vocab_size, dtype=torch.float32) #Initialise with float32
+        self.register_buffer("freqs_cis", precompute_freqs_cis(args), persistent=False)
+
+    def forward(self, tokens: torch.Tensor, start_pos: int = 0):
+        print(f"Transformer Forward - Input tokens shape: {tokens.shape}, tokens dtype: {tokens.dtype}")  # Debug print
+        seqlen = tokens.size(1)
+        h = self.embed(tokens)
+        freqs_cis = self.freqs_cis[start_pos:start_pos+seqlen]
+        mask = None
+        if seqlen > 1:
+            mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device).triu_(1)
+        for layer in self.layers:
+            h = layer(h, start_pos, freqs_cis, mask)
+        h = self.norm(h) # Don't select last token here.
+        logits = self.head(h) # Return *all* logits.
+        if world_size > 1:
+            all_logits = [torch.empty_like(logits) for _ in range(world_size)]
+            dist.all_gather(all_logits, logits)
+            logits = torch.cat(all_logits, dim=-1)
+        print(f"Transformer Forward - Output logits shape: {logits.shape}, logits dtype: {logits.dtype}")
+        return logits
+
+    def get_parameter_count(self):
+        count = 0
+        for p in self.parameters():
+            count += p.numel()
+        return count
+
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        for _ in range(max_new_tokens):
+            idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, -self.max_seq_len:]
+            logits = self(idx_cond)
+            logits = logits[:, -1, :] / temperature
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx, idx_next), dim=1)
+        return idx
+
+[File Ends] model.py
+
+[File Begins] sample.py
+import os
+import json
+import torch
+import torch.distributed as dist
+from transformers import AutoTokenizer
+from model import Transformer, ModelArgs
+import importlib
+from argparse import ArgumentParser
+from typing import List, Optional  # Import Optional
+
+
+def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
+    """Samples a token from the logits using temperature scaling and top-k filtering."""
+    logits = logits / max(temperature, 1e-5)
+    if top_k is not None:
+        v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+        logits[logits < v[:, [-1]]] = -float('Inf')  # Use -inf for masking
+    probs = torch.softmax(logits, dim=-1)
+    return torch.multinomial(probs, num_samples=1)
+
+@torch.inference_mode()
+def generate(model: Transformer, prompt_tokens: List[List[int]], max_new_tokens: int, eos_id: int, temperature: float = 1.0, top_k: Optional[int] = None) -> List[List[int]]:
+    """
+    Generates new tokens based on the given prompt tokens using the specified model.
+
+    Args:
+        model (Transformer): The transformer model used for token generation.
+        prompt_tokens (List[List[int]]): A list of lists containing the prompt tokens for each sequence.
+        max_new_tokens (int): The maximum number of new tokens to generate.
+        eos_id (int): The end-of-sequence token ID.
+        temperature (float, optional): The temperature value for sampling. Defaults to 1.0.
+        top_k (Optional[int], optional): The top-k value for sampling. Defaults to None.
+
+    Returns:
+        List[List[int]]: A list of lists containing the generated tokens for each sequence.
+    """
+    prompt_lens = [len(t) for t in prompt_tokens]
+    assert max(prompt_lens) <= model.max_seq_len, f"Prompt length exceeds model maximum sequence length (max_seq_len={model.max_seq_len})"
+    total_len = min(model.max_seq_len, max_new_tokens + max(prompt_lens))
+    tokens = torch.full((len(prompt_tokens), total_len), -1, dtype=torch.long, device="cuda")
+    for i, t in enumerate(prompt_tokens):
+        tokens[i, :len(t)] = torch.tensor(t, dtype=torch.long, device="cuda")
+    prev_pos = 0
+    finished = torch.tensor([False] * len(prompt_tokens), device="cuda")
+    prompt_mask = tokens != -1
+
+    for cur_pos in range(min(prompt_lens), total_len):
+        logits = model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+        next_token = sample(logits[:, -1, :], temperature, top_k) #sample from last token
+        next_token = torch.where(prompt_mask[:, cur_pos], tokens[:, cur_pos], next_token)
+        tokens[:, cur_pos] = next_token
+        finished |= torch.logical_and(~prompt_mask[:, cur_pos], next_token == eos_id)
+        prev_pos = cur_pos
+        if finished.all():
+            break
+
+    completion_tokens = []
+    for i, toks in enumerate(tokens.tolist()):
+        toks = toks[prompt_lens[i]:prompt_lens[i]+max_new_tokens]
+        if eos_id in toks:
+            toks = toks[:toks.index(eos_id)]
+        completion_tokens.append(toks)
+    return completion_tokens
+
+
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument("--ckpt-path", type=str, required=True, help="Path to the checkpoint directory")
+    parser.add_argument("--config", type=str, required=True, help="Path to the model configuration file (e.g., configs/10m.py)")
+    parser.add_argument("--prompt", type=str, default="", help="Initial prompt for text generation")
+    parser.add_argument("--max-new-tokens", type=int, default=100, help="Maximum number of tokens to generate")
+    parser.add_argument("--temperature", type=float, default=0.8, help="Temperature for sampling")
+    parser.add_argument("--top-k", type=int, default=None, help="Top-k sampling parameter")
+    parser.add_argument("--seed", type=int, default=1337, help="Random seed for reproducibility")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
     args = parser.parse_args()
 
 
-    model, tokenizer = load_model_and_tokenizer(args.ckpt_path, args.config_path)
+    # --- Setup: Seeding, Device, and Distributed ---
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+      device = 'cuda'
+      torch.cuda.manual_seed_all(args.seed)  # For multi-GPU
+    else:
+       device = 'cpu'
+       print("No CUDA, using CPU")
 
-    for _ in range(args.num_samples):
-        generated_text = generate_text(model, tokenizer, args.prompt, args.max_new_tokens, args.temperature, args.top_k)
-        print(generated_text)
-        print("-" * 20) # Separator between samples
+    # Handle distributed setup (if applicable)
+    if 'RANK' in os.environ:  # Check if running in a distributed environment
+        dist.init_process_group(backend="nccl")  # Or 'gloo' if NCCL isn't available
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+        local_rank = int(os.environ['LOCAL_RANK'])
+        torch.cuda.set_device(local_rank)
+        device = f'cuda:{local_rank}' # each process on their own cuda
+    else:
+        rank = 0
+        world_size = 1
+
+
+    # --- Load Model Args (from config file) ---
+    config_name = os.path.splitext(os.path.basename(args.config))[0]  # Extract config name
+    config_module = importlib.import_module(f"configs.{config_name}")
+    model_args = config_module.model_args  # Access ModelArgs
+
+    # --- Load Tokenizer (CRUCIAL: Use AutoTokenizer with the checkpoint directory) ---
+    # The tokenizer MUST be loaded from the same directory as the checkpoint.
+    # convert.py *should* have copied the tokenizer files there.
+    tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path)
+
+    # --- Create/Load Model ---
+    model = Transformer(model_args).to(device)
+
+    # --- Load Model Weights (Corrected for distributed setup) ---
+    if world_size > 1:
+       # Load the sharded checkpoint for the current process
+       model_file = os.path.join(args.ckpt_path, f"model{rank}-mp{world_size}.safetensors")
+       state_dict = torch.load(model_file, map_location=device)
+       model.load_state_dict(state_dict, strict=False)
+    elif os.path.exists(args.ckpt_path) and os.path.isdir(args.ckpt_path):
+        # Load the merged checkpoint if it's a directory
+        model_file = os.path.join(args.ckpt_path, f"model{rank}-mp{world_size}.safetensors")
+        state_dict = torch.load(model_file, map_location=device)
+        model.load_state_dict(state_dict, strict=False) #use strict=False since model expect scale but is not there
+    else:
+       checkpoint = torch.load(args.ckpt_path, map_location=device)
+       if 'model' in checkpoint:
+          model.load_state_dict(checkpoint['model'])  # Load from the 'model' key
+       else:
+          model.load_state_dict(checkpoint)
+
+    model.eval()  # Set the model to evaluation mode
+
+
+    # --- Prepare Prompt ---
+    if args.interactive:
+      messages = []
+      while True:
+            if world_size == 1:
+                prompt = input(">>> ")
+            elif rank == 0:
+                prompt = input(">>> ")
+                objects = [prompt]
+                dist.broadcast_object_list(objects, 0)
+            else:
+                objects = [None]
+                dist.broadcast_object_list(objects, 0)
+                prompt = objects[0]
+            if prompt == "/exit":
+                break
+            elif prompt == "/clear":
+                messages.clear()
+                continue
+            messages.append({"role": "user", "content": prompt})
+            prompt_tokens = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+            completion_tokens = generate(model, [prompt_tokens], args.max_new_tokens, tokenizer.eos_token_id, args.temperature, args.top_k)
+            completion = tokenizer.decode(completion_tokens[0]) #, skip_special_tokens=True) Remove skip special tokens, it may cause problems
+            print(completion)
+            messages.append({"role": "assistant", "content": completion})
+    else:
+         # --- Prepare Prompt ---
+        if args.prompt == "": # if prompt is empty, use the end of text token.
+           start_ids = [tokenizer.eos_token_id]
+        else:
+           start_ids = tokenizer.encode(args.prompt) # Encode the prompt
+
+        x = torch.tensor([start_ids], dtype=torch.long, device=device)
+
+        # --- Generate ---
+        with torch.no_grad():
+            y = model.generate(x, args.max_new_tokens, args.temperature, args.top_k)
+            print(tokenizer.decode(y[0].tolist())) #before this was missing
+            print("---------------")
+
+
+if __name__ == "__main__":
+   main()
+
+[File Ends] sample.py
+
+[File Begins] train.py
+import os
+import sys
+import time
+import math
+import pickle
+from contextlib import nullcontext
+
+import numpy as np
+import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+
+# --- Import model and ModelArgs ---
+from model import Transformer, ModelArgs
+import importlib  # Used for loading config
+
+
+# --- Configuration ---
+out_dir = 'out-deepseek'
+eval_interval = 2000
+log_interval = 1  # Log more frequently during debugging
+eval_iters = 20  # Reduce for faster debugging
+eval_only = False
+always_save_checkpoint = True
+init_from = 'scratch'  # 'scratch', 'resume'
+
+# --- WandB ---
+wandb_log = False  # Turn on to use wandb
+wandb_project = 'deepseek-train'
+wandb_run_name = 'run'
+
+# --- Data ---
+dataset = 'shakespeare' # or the name of your dataset
+gradient_accumulation_steps = 32  # Adjust based on your GPU and batch_size
+batch_size = 4 # Reduced batch size, adjust this value if you have a better GPU
+block_size = 128 # Reduced block size, adjust.
+# block_size = 4096  # original value
+
+# --- Optimizer ---
+learning_rate = 6e-4
+max_iters = 400       # Limit to 400 iterations for testing
+weight_decay = 1e-1
+beta1 = 0.9
+beta2 = 0.95
+grad_clip = 1.0
+decay_lr = True
+warmup_iters = 200   # Proportional to max_iters
+lr_decay_iters = 400 # Proportional to max_iters
+min_lr = 6e-5
+
+# --- DDP ---
+backend = 'nccl'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # Use bfloat16 if available
+compile = False # Disable compile by default.
+
+
+# --- Helper Functions ---
+def get_batch(split, train_data, val_data):
+    data = train_data if split == 'train' else val_data
+    ix = torch.randint(len(data) - block_size, (batch_size,))
+    x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
+    y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
+    x, y = x.to(device), y.to(device)
+    print(f"get_batch - x shape: {x.shape}, x dtype: {x.dtype}, x device: {x.device}")  # Debug print
+    print(f"get_batch - y shape: {y.shape}, y dtype: {y.dtype}, y device: {y.device}")  # Debug print
+    return x, y
+
+@torch.no_grad()
+def estimate_loss(model, ctx, eval_iters, train_data, val_data):
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split, train_data, val_data)
+            with ctx:
+                logits = model(X)
+                logits = logits.view(-1, logits.size(-1))
+                Y = Y.view(-1)
+                loss = torch.nn.functional.cross_entropy(logits, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
+
+def get_lr(it, learning_rate, warmup_iters, lr_decay_iters, min_lr):
+    if it < warmup_iters:
+        return learning_rate * it / warmup_iters
+    if it > lr_decay_iters:
+        return min_lr
+    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (learning_rate - min_lr)
+
+# --- Main Training Script ---
+
+if __name__ == '__main__':
+
+    # --- Setup DDP ---
+    ddp = int(os.environ.get('RANK', -1)) != -1
+    if ddp:
+        init_process_group(backend=backend)
+        ddp_rank = int(os.environ['RANK'])
+        ddp_local_rank = int(os.environ['LOCAL_RANK'])
+        ddp_world_size = int(os.environ['WORLD_SIZE'])
+        device = f'cuda:{ddp_local_rank}'
+        torch.cuda.set_device(device)
+        master_process = ddp_rank == 0
+        seed_offset = ddp_rank
+        assert gradient_accumulation_steps % ddp_world_size == 0
+        gradient_accumulation_steps //= ddp_world_size
+    else:
+        master_process = True
+        seed_offset = 0
+        ddp_world_size = 1
+    tokens_per_iter = gradient_accumulation_steps * ddp_world_size * batch_size * block_size
+    print(f"tokens per iteration will be: {tokens_per_iter:,}")
+
+    if master_process:
+        os.makedirs(out_dir, exist_ok=True)
+    torch.manual_seed(1337 + seed_offset)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    device_type = 'cuda' if 'cuda' in device else 'cpu'
+    ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
+    ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+
+    # --- Data Loading ---
+    data_dir = os.path.join('data', dataset)
+    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.int64, mode='r')  # Load int64
+    val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')    # Load int64
+
+
+    # --- Load Configuration from Command Line ---
+    if len(sys.argv) < 2:
+        print("Usage: python train.py <config_file>")
+        sys.exit(1)
+    config_file = sys.argv[1]  # Get config file path from command line
+    config_name = os.path.splitext(os.path.basename(config_file))[0]  # Extract config name
+    config_module = importlib.import_module(f"configs.{config_name}")
+    model_args = config_module.model_args  # Access ModelArgs
+
+
+    # --- Model Initialization ---
+    if init_from == 'scratch':
+        model = Transformer(model_args)
+        print(f"Parameter count: {model.get_parameter_count():,}")
+    elif init_from == 'resume':
+       ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+       checkpoint = torch.load(ckpt_path, map_location=device)
+       model_args = checkpoint['model_args']  # Load saved ModelArgs
+       model = Transformer(model_args)      # Recreate the model
+       state_dict = checkpoint['model']
+       unwanted_prefix = '_orig_mod.'
+       for k, v in list(state_dict.items()):
+          if k.startswith(unwanted_prefix):
+            state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
+       model.load_state_dict(state_dict)
+       iter_num = checkpoint.get('iter_num', 0)
+       best_val_loss = checkpoint.get('best_val_loss', 1e9)
+
+    model.to(device)
+
+    # --- Optimizer and Scaler ---
+    scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, betas=(beta1, beta2), weight_decay=weight_decay)
+    if init_from == 'resume':
+       optimizer.load_state_dict(checkpoint['optimizer'])  # Load optimizer state
+    #if compile:  # DISABLE COMPILATION FOR NOW
+    #    model = torch.compile(model)
+    if ddp:
+        model = DDP(model, device_ids=[ddp_local_rank])
+
+    # --- Training Loop ---
+    iter_num = 0
+    best_val_loss = 1e9
+    t0 = time.time()
+    local_iter_num = 0
+
+    while True:
+        lr = get_lr(iter_num, learning_rate, warmup_iters, lr_decay_iters, min_lr) if decay_lr else learning_rate
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+
+        if iter_num % eval_interval == 0 and master_process:
+            losses = estimate_loss(model, ctx, eval_iters, train_data, val_data)
+            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            if losses['val'] < best_val_loss or always_save_checkpoint:
+                best_val_loss = losses['val']
+                checkpoint = {
+                    'model': model.module.state_dict() if ddp else model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'model_args': model_args.__dict__,  # Save ModelArgs
+                    'iter_num': iter_num,
+                    'best_val_loss': best_val_loss,
+                    'config': {},  # You might want to populate this
+                }
+                print(f"saving checkpoint to {out_dir}")
+                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+
+        if iter_num == 0 and eval_only:
+            break
+
+        accumulated_loss = None
+
+        for micro_step in range(gradient_accumulation_steps):
+            if ddp:
+                model.require_backward_grad_sync = (micro_step == gradient_accumulation_steps - 1)
+
+            X, Y = get_batch('train', train_data, val_data)
+
+            with ctx:
+                logits = model(X)
+                logits = logits.view(-1, logits.size(-1))
+                Y_flat = Y.view(-1)
+                logits = logits.to(torch.float32)  # Cast logits to float32
+                loss = torch.nn.functional.cross_entropy(logits, Y_flat)
+                loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
+
+                # --- Debug Prints ---
+                print(f"Micro-step: {micro_step}")
+                print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
+                print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
+                print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
+                if torch.cuda.is_available():
+                    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
+                    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
+                    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
+                # ----------------------
+            scaled_loss = scaler.scale(loss) # Scale
+            if accumulated_loss is None:
+                accumulated_loss = scaled_loss
+            else:
+                accumulated_loss += scaled_loss
+
+        # --- BACKWARD PASS OUTSIDE THE INNER LOOP---
+        accumulated_loss.backward()
+
+        if grad_clip != 0.0:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad(set_to_none=True)
+
+        t1 = time.time()
+        dt = t1 - t0
+        t0 = t1
+        if iter_num % log_interval == 0 and master_process:
+            lossf = loss.item() * gradient_accumulation_steps  # this is now correct
+            print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms")
+        iter_num += 1
+        local_iter_num += 1
+
+        if iter_num > max_iters:
+            break
+
+    if ddp:
+        destroy_process_group()
+
+[File Ends] train.py
+
+
+<-- File Content Ends
+

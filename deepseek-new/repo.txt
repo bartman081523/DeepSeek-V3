@@ -11,68 +11,13 @@ Directory/File Tree Begins -->
 
 /
 ├── __pycache__
-├── data
-│   └── shakespeare
-│       ├── prepare.py
-│       ├── readme.md
 ├── kernel.py
 ├── model.py
-├── out-deepseek
 └── train.py
 
 <-- Directory/File Tree Ends
 
 File Content Begin -->
-[File Begins] data/shakespeare/prepare.py
-import os
-import requests
-import tiktoken
-import numpy as np
-
-# download the tiny shakespeare dataset
-input_file_path = os.path.join(os.path.dirname(__file__), 'input.txt')
-if not os.path.exists(input_file_path):
-    data_url = 'https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt'
-    with open(input_file_path, 'w', encoding='utf-8') as f:
-        f.write(requests.get(data_url).text)
-
-with open(input_file_path, 'r', encoding='utf-8') as f:
-    data = f.read()
-n = len(data)
-train_data = data[:int(n*0.9)]
-val_data = data[int(n*0.9):]
-
-# encode with tiktoken gpt2 bpe
-enc = tiktoken.get_encoding("gpt2")
-train_ids = enc.encode_ordinary(train_data)
-val_ids = enc.encode_ordinary(val_data)
-print(f"train has {len(train_ids):,} tokens")
-print(f"val has {len(val_ids):,} tokens")
-
-# export to bin files
-train_ids = np.array(train_ids, dtype=np.uint16)
-val_ids = np.array(val_ids, dtype=np.uint16)
-train_ids.tofile(os.path.join(os.path.dirname(__file__), 'train.bin'))
-val_ids.tofile(os.path.join(os.path.dirname(__file__), 'val.bin'))
-
-# train.bin has 301,966 tokens
-# val.bin has 36,059 tokens
-
-[File Ends] data/shakespeare/prepare.py
-
-[File Begins] data/shakespeare/readme.md
-
-# tiny shakespeare
-
-Tiny shakespeare, of the good old char-rnn fame :)
-
-After running `prepare.py`:
-
-- train.bin has 301,966 tokens
-- val.bin has 36,059 tokens
-
-[File Ends] data/shakespeare/readme.md
-
 [File Begins] kernel.py
 from typing import Tuple
 
@@ -423,12 +368,16 @@ def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] =
         return F.linear(x, weight, bias)
     elif gemm_impl == "bf16":
         weight = weight_dequant(weight, weight.scale)
+        if x.dtype != torch.bfloat16:  # Add this check and cast
+            x = x.to(torch.bfloat16)
         return F.linear(x, weight, bias)
     else:
         x, scale = act_quant(x, block_size)
         y = fp8_gemm(x, scale, weight, weight.scale)
         if bias is not None:
             y += bias
+        if y.dtype != torch.bfloat16:
+            y = y.to(torch.bfloat16)
         return y
 
 
@@ -1159,7 +1108,7 @@ min_lr = 6e-5
 
 # DDP settings
 backend = 'nccl'
-device = 'cuda'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 dtype = 'bfloat16'
 compile = True
 
@@ -1304,8 +1253,11 @@ if __name__ == '__main__':
        iter_num = checkpoint.get('iter_num', 0)
        best_val_loss = checkpoint.get('best_val_loss', 1e9)
 
-    model.to(device)
-
+    try:
+        model.to(device)
+    except:
+        device='cpu'
+        model.to(device)
 
     # --- Optimizer and Scaler ---
     scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))

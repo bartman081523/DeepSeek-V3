@@ -1,7 +1,5 @@
 """
-Hypothetical training script for the DeepSeek model, based on the provided
-deepseek-inference/model.py and common transformer training practices.
-This is NOT the official DeepSeek training code, which has not been released.
+Hypothetical training script for the DeepSeek model.
 """
 
 import os
@@ -15,32 +13,28 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
-from model import Transformer, ModelArgs  # Import from the provided directory
+from model import Transformer, ModelArgs
 
 
-# --- Configuration (Defaults and Overrides) ---
-# These defaults are a starting point; adjust them as needed.
+# --- Configuration --- (No changes here)
 out_dir = 'out-deepseek'
 eval_interval = 2000
 log_interval = 1
 eval_iters = 200
 eval_only = False
 always_save_checkpoint = True
-init_from = 'scratch'  # 'scratch', 'resume'
+init_from = 'scratch'
 wandb_log = False
 wandb_project = 'deepseek-train'
 wandb_run_name = 'deepseek'
-
-# Data settings (Placeholder - you'll need your dataset!)
-dataset = 'shakespeare'  # Replace with your dataset name
-gradient_accumulation_steps = 8
-batch_size = 4  # Adjust based on your GPU memory
-block_size = 4096 # Set to match pre-trained models.
-
-# Model args (These should align with the pre-trained models you have)
-# You MUST set these to match the model you intend to train/fine-tune.
+dataset = 'shakespeare'
+#gradient_accumulation_steps = 8
+gradient_accumulation_steps = 32
+#batch_size = 4
+batch_size = 1
+block_size = 4096
 n_layers = 27
-n_dense_layers = 1 #Example Value
+n_dense_layers = 1
 n_heads = 16
 n_routed_experts = 64
 n_shared_experts = 2
@@ -63,42 +57,36 @@ mscale = 1.
 dim = 2048
 inter_dim = 10944
 moe_inter_dim = 1408
-vocab_size = 102400 #Example Value.  Important to set correctly!
-
-# Optimizer settings
+vocab_size = 102400
 learning_rate = 6e-4
 max_iters = 600000
 weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95
 grad_clip = 1.0
-
 decay_lr = True
 warmup_iters = 2000
 lr_decay_iters = 600000
 min_lr = 6e-5
-
-# DDP settings
 backend = 'nccl'
-device = 'cuda'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 dtype = 'bfloat16'
 compile = True
 
 
-
 # --- Helper Functions ---
-
-def get_batch(split, train_data, val_data):  # Pass train/val data directly
+def get_batch(split, train_data, val_data):
     data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     if device_type == 'cuda':
+        # NO dtype here.  Keep x and y as int64
         x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
     else:
+        # NO dtype here. Keep x and y as int64
         x, y = x.to(device), y.to(device)
     return x, y
-
 
 @torch.no_grad()
 def estimate_loss(model, ctx, eval_iters, train_data, val_data):
@@ -109,8 +97,7 @@ def estimate_loss(model, ctx, eval_iters, train_data, val_data):
         for k in range(eval_iters):
             X, Y = get_batch(split, train_data, val_data)
             with ctx:
-                logits = model(X) #targets are not passed.
-                # Reshape logits to [B*T, vocab_size] and targets to [B*T]
+                logits = model(X)
                 logits = logits.view(-1, logits.size(-1))
                 Y = Y.view(-1)
                 loss = torch.nn.functional.cross_entropy(logits, Y)
@@ -118,7 +105,6 @@ def estimate_loss(model, ctx, eval_iters, train_data, val_data):
         out[split] = losses.mean()
     model.train()
     return out
-
 
 def get_lr(it, learning_rate, warmup_iters, lr_decay_iters, min_lr):
     if it < warmup_iters:
@@ -129,7 +115,6 @@ def get_lr(it, learning_rate, warmup_iters, lr_decay_iters, min_lr):
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return min_lr + coeff * (learning_rate - min_lr)
-
 
 # --- Main Training Script ---
 
@@ -160,17 +145,31 @@ if __name__ == '__main__':
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-    device_type = 'cuda' if 'cuda' in device else 'cpu'
+
+    # --- Device Selection (with try-except) ---
+    try:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            device_type = 'cuda'
+            # Attempt to allocate a dummy tensor to check for CUDA availability *before* initializing the model
+            torch.empty((1,), device=device)
+        else:
+            device = 'cpu'
+            device_type = 'cpu'
+    except RuntimeError as e:
+        if 'out of memory' in str(e).lower():
+            print("CUDA out of memory. Falling back to CPU.")
+            device = 'cpu'
+            device_type = 'cpu'
+        else:
+            raise  # Re-raise other RuntimeErrors
+
     ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
     ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-
-
     # --- Data Loading ---
-    #  You'll need to replace this with your actual data loading.
-    #  This assumes a .bin file like the nanoGPT example.
     data_dir = os.path.join('data', dataset)
-    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
-    val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
+    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.int64, mode='r')
+    val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')
 
     # --- Model Initialization ---
     if init_from == 'scratch':
@@ -196,43 +195,39 @@ if __name__ == '__main__':
             beta_fast=beta_fast,
             beta_slow = beta_slow,
             mscale=mscale,
-            max_batch_size=batch_size,  # Add max_batch_size
-            max_seq_len=block_size,      # Add max_seq_len
-            vocab_size=vocab_size,       # Add vocab_size
+            max_batch_size=batch_size,
+            max_seq_len=block_size,
+            vocab_size=vocab_size,
             dim = dim,
             inter_dim = inter_dim,
             moe_inter_dim = moe_inter_dim,
-            dtype=dtype,                 # Add dtype
+            dtype=dtype,
         )
-
         model_args = ModelArgs(**model_args)
         model = Transformer(model_args)
+
     elif init_from == 'resume':
-       ckpt_path = os.path.join(out_dir, 'ckpt.pt')
-       checkpoint = torch.load(ckpt_path, map_location=device)
-       model_args = checkpoint['model_args']  # Load model args from checkpoint
+        ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+        checkpoint = torch.load(ckpt_path, map_location=device)
+        model_args = checkpoint['model_args']
+        model = Transformer(model_args)
+        state_dict = checkpoint['model']
+        unwanted_prefix = '_orig_mod.'
+        for k, v in list(state_dict.items()):
+            if k.startswith(unwanted_prefix):
+                state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
+        model.load_state_dict(state_dict)
+        iter_num = checkpoint.get('iter_num', 0)
+        best_val_loss = checkpoint.get('best_val_loss', 1e9)
 
-       #Recreate the model
-       model = Transformer(model_args)
-       state_dict = checkpoint['model']
-
-       # Remove unwanted prefix (if present)
-       unwanted_prefix = '_orig_mod.'
-       for k, v in list(state_dict.items()):
-          if k.startswith(unwanted_prefix):
-            state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
-       model.load_state_dict(state_dict)
-       iter_num = checkpoint.get('iter_num', 0)
-       best_val_loss = checkpoint.get('best_val_loss', 1e9)
-
-    model.to(device)
+    model.to(device)  # Move model to the selected device
 
 
     # --- Optimizer and Scaler ---
     scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, betas=(beta1, beta2), weight_decay=weight_decay)
     if init_from == 'resume':
-       optimizer.load_state_dict(checkpoint['optimizer'])  # Load optimizer state
+        optimizer.load_state_dict(checkpoint['optimizer'])
     if compile:
         model = torch.compile(model)
     if ddp:
@@ -265,10 +260,10 @@ if __name__ == '__main__':
                 checkpoint = {
                     'model': model.module.state_dict() if ddp else model.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'model_args': model_args,  # Save ModelArgs
+                    'model_args': model_args,
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
-                    'config': {},  # You might want to populate this
+                    'config': {},
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
@@ -280,12 +275,9 @@ if __name__ == '__main__':
             if ddp:
                 model.require_backward_grad_sync = (micro_step == gradient_accumulation_steps - 1)
             with ctx:
-
-                logits = model(X)  # Forward pass without targets
-                # Reshape logits to [B*T, vocab_size] and targets to [B*T]
+                logits = model(X)
                 logits = logits.view(-1, logits.size(-1))
                 Y_flat = Y.view(-1)
-
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps
             X, Y = get_batch('train', train_data, val_data)

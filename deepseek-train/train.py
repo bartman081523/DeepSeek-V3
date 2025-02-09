@@ -26,7 +26,7 @@ always_save_checkpoint = True
 init_from = 'scratch'  # 'scratch', 'resume'
 
 # --- WandB ---
-wandb_log = False  # Turn on to use wandb
+wandb_log = True # Turn on to use wandb
 wandb_project = 'deepseek-train'
 wandb_run_name = 'run'
 
@@ -38,7 +38,7 @@ block_size = 128 # Reduced block size, adjust.
 # block_size = 4096  # original value
 
 # --- Optimizer ---
-learning_rate = 6e-4
+learning_rate = 1e-3 # Modified learning rate.
 #max_iters = 600000
 max_iters = 400       # Limit to 400 iterations for testing
 weight_decay = 1e-1
@@ -64,6 +64,14 @@ def get_batch(split, train_data, val_data):
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     x, y = x.to(device), y.to(device)
+
+    # --- DEBUGGING: Print data statistics ---
+    print(f"--- {split} data ---")
+    print(f"  x shape: {x.shape}, x dtype: {x.dtype}, x min: {x.min()}, x max: {x.max()}")
+    print(f"  y shape: {y.shape}, y dtype: {y.dtype}, y min: {y.min()}, y max: {y.max()}")
+    print(f"  First few x tokens (first batch): {x[0, :10]}")  # Print first 10 tokens
+    print(f"  First few y tokens (first batch): {y[0, :10]}")
+
     return x, y
 
 @torch.no_grad()
@@ -75,11 +83,37 @@ def estimate_loss(model, ctx, eval_iters, train_data, val_data):
         for k in range(eval_iters):
             X, Y = get_batch(split, train_data, val_data)
             with ctx:
-                logits = model(X) # logits will have shape (batch_size, seq_len, vocab_size)
+                logits = model(X)
                 B, T, C = logits.shape
-                logits = logits.view(B*T, C) # Reshape for cross_entropy
-                Y = Y.view(B*T)  # Flatten Y to match
+                logits = logits.view(B*T, C)
+                Y = Y.view(B*T)
+
+                 # --- DEBUGGING: Inspect logits and Y ---
+                print(f"--- {split} - Iteration {k} ---")
+                print(f"  Logits shape: {logits.shape}, Logits dtype: {logits.dtype}")
+                print(f"  Logits min: {logits.min()}, Logits max: {logits.max()}, Logits mean: {logits.mean()}, Logits std: {logits.std()}")
+                print(f"  Y shape: {Y.shape}, Y dtype: {Y.dtype}")
+                print(f"  Y min: {Y.min()}, Y max: {Y.max()}")
+                unique_y = torch.unique(Y)
+                print(f"  Unique Y values: {unique_y.tolist()}") # Check for variety in Y
+
+                # --- DEBUGGING: Check for NaN or Inf in logits ---
+                if torch.isnan(logits).any() or torch.isinf(logits).any():
+                    print("NaN or Inf detected in logits!")
+                    print("Logits:", logits)  # Print the logits
+                    # Optionally, save the model state for later inspection
+                    torch.save(model.state_dict(), "model_with_nan_logits.pt")
+                    raise ValueError("NaN or Inf in logits")
+
                 loss = torch.nn.functional.cross_entropy(logits, Y)
+
+                 # --- DEBUGGING: Check for NaN or Inf in loss ---
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print("NaN or Inf detected in loss!")
+                    print("Logits:", logits)
+                    print("Y_flat:", Y_flat)
+                    raise ValueError("NaN or Inf in loss")
+
             losses[k] = loss.item()
         out[split] = losses.mean()
     model.train()
@@ -133,6 +167,10 @@ if __name__ == '__main__':
     train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.int64, mode='r')  # Load int64
     val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')    # Load int64
 
+     # --- Get a single batch for overfitting ---
+    X, Y = get_batch('train', train_data, val_data)  # Get *one* batch
+    X, Y = X.to(device), Y.to(device)  # Keep on device
+
 
    # --- Load Configuration from Command Line ---
     if len(sys.argv) < 2:
@@ -145,6 +183,7 @@ if __name__ == '__main__':
         with open(config_file, 'r') as f:
             config = json.load(f)
             model_args = ModelArgs(**config['model_args']) # Get args from the 'model_args' dictionary
+            print(model_args)
     except FileNotFoundError:
         print(f"Error: Config file not found at {config_file}")
         exit(1)
@@ -171,6 +210,11 @@ if __name__ == '__main__':
         **config['model_args'],  # Add all the parameters from model_args
         "model_type": "deepseek_v3",  # VERY IMPORTANT: This must match your config class name.
     }
+
+    # --- WandB Initialization (Conditional) ---
+    if wandb_log and master_process:
+        import wandb
+        wandb.init(project=wandb_project, name=wandb_run_name, config=config_dict)
 
 
     # Save the *complete* configuration as config.json
@@ -206,6 +250,8 @@ if __name__ == '__main__':
        model.load_state_dict(state_dict)
        iter_num = checkpoint.get('iter_num', 0)
        best_val_loss = checkpoint.get('best_val_loss', 1e9)
+
+    print("config_dict", config_dict)
 
     model.to(device)
 
@@ -255,15 +301,40 @@ if __name__ == '__main__':
             if ddp:
                 model.require_backward_grad_sync = (micro_step == gradient_accumulation_steps - 1)
 
-            X, Y = get_batch('train', train_data, val_data)
+            # X, Y = get_batch('train', train_data, val_data)
+            # ---- Debugging Prints (Data Loading) ----
+            #print(f"Micro-step: {micro_step}")
+            #print(f"  X shape: {X.shape}, X dtype: {X.dtype}, X min: {X.min()}, X max: {X.max()}")
+            #print(f"  Y shape: {Y.shape}, Y dtype: {Y.dtype}, Y min: {Y.min()}, Y max: {Y.max()}")
 
             with ctx:
                 logits = model(X)
-                logits = logits.view(-1, logits.size(-1))
-                Y_flat = Y.view(-1)
+                # ---- Debugging Prints (Model Output) ----
+                #print(f"  Logits shape: {logits.shape}, Logits dtype: {logits.dtype}")
+                #if torch.isnan(logits).any():
+                #    print("  NaNs detected in logits!")
+
+                B, T, C = logits.shape #get the expected shape
+                logits = logits.view(B*T, C) #reshape
+                Y_flat = Y.view(B*T) #reshape
                 #logits = logits.to(torch.float32)  # Cast logits to float32 # No need for casting, the linear layer is doing it fine.
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
+                if torch.isnan(loss) or torch.isinf(loss):
+                  print("NaN or Inf detected in loss!")
+                  print("Logits:", logits)
+                  print("Y_flat:", Y_flat)
+                  raise ValueError("NaN or Inf in loss")
+                # --- Debug Prints ---
+                #print(f"Micro-step: {micro_step}")
+                #print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
+                #print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
+                #print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
+                #if torch.cuda.is_available():
+                #    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
+                #    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
+                #    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
+                # ----------------------
             scaled_loss = scaler.scale(loss) # Scale
             if accumulated_loss is None:
                 accumulated_loss = scaled_loss
@@ -276,6 +347,23 @@ if __name__ == '__main__':
         if grad_clip != 0.0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+
+        # --- GRADIENT DEBUGGING ---
+        print("--- Gradients ---")
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                print(f"  {name}: grad.norm() = {param.grad.norm().item()}") #.item to get values to wandb
+                #  Log some gradient statistics to WandB
+                if wandb_log and master_process:
+                    wandb.log({
+                       f"grad_norm/{name}": param.grad.norm().item(),
+                       f"grad_mean/{name}": param.grad.mean().item(),
+                       f"grad_max/{name}": param.grad.max().item(),
+                    })
+
+            else:
+                print(f"  {name}: No gradient!")
+        # --- END GRADIENT DEBUGGING ---
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad(set_to_none=True)
@@ -286,6 +374,12 @@ if __name__ == '__main__':
         if iter_num % log_interval == 0 and master_process:
             lossf = loss.item() * gradient_accumulation_steps  # this is now correct
             print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms")
+            if wandb_log:
+                wandb.log({
+                    "iter": iter_num,
+                    "loss": lossf,
+                    "lr": lr,
+                })
         iter_num += 1
         local_iter_num += 1
 

@@ -10,11 +10,11 @@ import torch.distributed as dist
 from kernel import act_quant, weight_dequant, fp8_gemm
 
 
-world_size = 1
+world_size = 1  # These are better handled through config or command-line args.
 rank = 0
-block_size = 128
-gemm_impl: Literal["bf16", "fp8"] = "bf16"
-attn_impl: Literal["naive", "absorb"] = "absorb"
+block_size = 128  # Defined in config
+gemm_impl: Literal["bf16", "fp8"] = "bf16"  # Best to get this from config, too
+attn_impl: Literal["naive", "absorb"] = "naive"  #Best kept simple for this test.
 
 @dataclass
 class ModelArgs:
@@ -49,6 +49,7 @@ class ModelArgs:
     beta_fast: int = 32
     beta_slow: int = 1
     mscale: float = 1.
+    initializer_range: float = 0.02
 
 
 class ParallelEmbedding(nn.Module):
@@ -63,7 +64,6 @@ class ParallelEmbedding(nn.Module):
         self.weight = nn.Parameter(torch.empty(self.part_vocab_size, self.dim, dtype=torch.bfloat16)) # Enforce bfloat16
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        #print(f"ParallelEmbedding - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug
         if world_size > 1:
             mask = (x < self.vocab_start_idx) | (x >= self.vocab_end_idx)
             x = x - self.vocab_start_idx
@@ -72,17 +72,13 @@ class ParallelEmbedding(nn.Module):
         if world_size > 1:
             y[mask] = 0
             dist.all_reduce(y)
-        #print(f"ParallelEmbedding - Output y shape: {y.shape}, y dtype: {y.dtype}")  # Debug
         return y
 
 
 
 def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] = None) -> torch.Tensor:
-    #print(f"linear - Input x dtype: {x.dtype}, weight dtype: {weight.dtype}, bias dtype: {bias.dtype if bias is not None else None}")  # Debug print
     if weight.element_size() > 1:  # quantized
-        out = F.linear(x, weight, bias)
-        #print(f"linear - Output out dtype (weight.element_size() > 1): {out.dtype}")
-        return out
+        return F.linear(x, weight, bias)
     elif gemm_impl == "bf16":
         # Only dequantize and convert to float32 if the weight is NOT already float32
         if weight.dtype != torch.float32:
@@ -96,7 +92,6 @@ def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] =
             bias = bias.to(torch.float32)
 
         out = F.linear(x, weight, bias)  # Now, x is bfloat16, weight is float32
-        #print(f"linear - Output out dtype (gemm_impl == bf16): {out.dtype}") # Debug
         return out
     else:  # gemm_impl == "fp8"
         x, scale = act_quant(x, block_size)
@@ -105,7 +100,6 @@ def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] =
             y += bias
         if y.dtype != torch.bfloat16:  # Keep consistent output dtype
           y = y.to(torch.bfloat16)
-        #print(f"linear - Output y dtype (gemm_impl == fp8): {y.dtype}")
         return y
 
 
@@ -116,7 +110,9 @@ class Linear(nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=dtype or Linear.dtype))
+        actual_dtype = dtype or Linear.dtype
+        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=actual_dtype))
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))  # Kaiming initialization
         if self.weight.element_size() == 1:
             scale_out_features = (out_features + block_size - 1) // block_size
             scale_in_features = (in_features + block_size - 1) // block_size
@@ -125,10 +121,11 @@ class Linear(nn.Module):
             self.register_parameter("scale", None)
         if bias:
             self.bias = nn.Parameter(torch.empty(out_features, dtype= actual_dtype))  # Enforce dtype
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight) #for init bias
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0 #for init bias
+            nn.init.uniform_(self.bias, -bound, bound) #for init bias
         else:
             self.register_parameter("bias", None)
-        #print(f"Linear __init__ - Weight dtype: {self.weight.dtype}, Bias dtype: {self.bias.dtype if self.bias is not None else None}")
-
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return linear(x, self.weight, self.bias)
@@ -138,11 +135,6 @@ class ColumnParallelLinear(Linear):
     def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype = None):
         assert out_features % world_size == 0, f"Output features must be divisible by world size (world_size={world_size})"
         self.part_out_features = out_features // world_size
-        # Crucially, we *force* the dtype here if it's the head.
-        # This ensures the output of the head is float32.
-        #if out_features == 102400: # Check the number of output features
-        #    super().__init__(in_features, self.part_out_features, bias, dtype=torch.float32) # Force float32 for head
-        #else:
         super().__init__(in_features, self.part_out_features, bias, dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -165,17 +157,19 @@ class RowParallelLinear(Linear):
         return y
 
 class RMSNorm(nn.Module):
-    def __init__(self, dim: int, eps: float = 1e-6):
+    def __init__(self, dim: int, eps: float = 1e-5):  # Use 1e-5 for eps
         super().__init__()
         self.dim = dim
-        self.eps = eps
-        self.weight = nn.Parameter(torch.ones(dim, dtype=torch.bfloat16))  # Enforce bfloat16
+        self.eps = eps  # Now using 1e-5
+        self.weight = nn.Parameter(torch.ones(dim))
 
     def forward(self, x: torch.Tensor):
-        #print(f"RMSNorm - Input x shape: {x.shape}, x dtype: {x.dtype}, weight dtype: {self.weight.dtype}")  # Debug print
-        return F.rms_norm(x, (self.dim,), self.weight, self.eps)
-
-
+        if torch.isnan(x).any():
+            raise ValueError("NaN detected in RMSNorm input")
+        x = F.rms_norm(x.float(), (self.dim,), self.weight, self.eps).to(self.weight.dtype)
+        if torch.isnan(x).any():
+            raise ValueError("NaN detected in RMSNorm output")
+        return x
 
 def precompute_freqs_cis(args: ModelArgs) -> torch.Tensor:
     dim = args.qk_rope_head_dim
@@ -268,7 +262,6 @@ class MLA(nn.Module):
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
         bsz, seqlen, _ = x.size()
         end_pos = start_pos + seqlen
-        #print(f"MLA Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         if self.q_lora_rank == 0:
             q = self.wq(x)
         else:
@@ -305,7 +298,6 @@ class MLA(nn.Module):
             x = torch.einsum("bsht,btc->bshc", scores, self.kv_cache[:bsz, :end_pos])
             x = torch.einsum("bshc,hdc->bshd", x, wkv_b[:, -self.v_head_dim:])
         x = self.wo(x.flatten(2))
-        #print(f"MLA Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         return x
 
 
@@ -317,15 +309,12 @@ class MLP(nn.Module):
         self.w3 = ColumnParallelLinear(dim, inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        #print(f"MLP Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
-        out = self.w2(F.silu(self.w1(x)) * self.w3(x))
-        #print(f"MLP Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
-        return out
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 
 
 class Gate(nn.Module):
-    # (Uses Linear, so dtype should be handled)
+    # (Uses Linear and Gate, so dtype should be handled)
     def __init__(self, args: ModelArgs):
         super().__init__()
         self.dim = args.dim
@@ -338,7 +327,6 @@ class Gate(nn.Module):
         self.bias = nn.Parameter(torch.empty(args.n_routed_experts, dtype=torch.bfloat16)) if self.dim == 7168 else None # Enforce bfloat16
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        #print(f"Gate Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")
         scores = linear(x, self.weight)
         if self.score_func == "softmax":
             scores = scores.softmax(dim=-1, dtype=torch.float32)
@@ -372,10 +360,7 @@ class Expert(nn.Module):
         self.w3 = Linear(dim, inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        #print(f"Expert Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
-        out = self.w2(F.silu(self.w1(x)) * self.w3(x))
-        #print(f"Expert Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
-        return out
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 class MoE(nn.Module):
     # (Uses Linear and Gate, so dtype should be handled)
@@ -394,7 +379,6 @@ class MoE(nn.Module):
         self.shared_experts = MLP(args.dim, args.n_shared_experts * args.moe_inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        #print(f"MoE Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         shape = x.size()
         x = x.view(-1, self.dim)
         weights, indices = self.gate(x)
@@ -410,8 +394,6 @@ class MoE(nn.Module):
         if world_size > 1:
             dist.all_reduce(y)
         out = (y + z).view(shape)
-        #print(f"MoE Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
-
         return out
 
 
@@ -425,8 +407,8 @@ class Block(nn.Module):
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
         #print(f"Block Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
-        if self.attn is not None:
-          x = x + self.attn(self.attn_norm(x), start_pos, freqs_cis, mask)
+        #if self.attn is not None: # TEMPORARILY disable attention for debugging
+        #  x = x + self.attn(self.attn_norm(x), start_pos, freqs_cis, mask)
         x = x + self.ffn(self.ffn_norm(x))
         #print(f"Block Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         return x
@@ -439,33 +421,33 @@ class Transformer(nn.Module):
         rank = dist.get_rank() if dist.is_initialized() else 0
         Linear.dtype = torch.float8_e4m3fn if args.dtype == "fp8" else torch.bfloat16  # Set default dtype for Linear layers.
         super().__init__()
+        self.args = args  # Store args for easy access.  CRITICAL for _init_weights
         self.max_seq_len = args.max_seq_len
         self.embed = ParallelEmbedding(args.vocab_size, args.dim)
         self.layers = torch.nn.ModuleList()
         for layer_id in range(args.n_layers):
             self.layers.append(Block(layer_id, args))
         self.norm = RMSNorm(args.dim)
-        self.head = ColumnParallelLinear(args.dim, args.vocab_size) #Initialise with bfloat16 (the same a embed)
+        self.head = ColumnParallelLinear(args.dim, args.vocab_size)
         self.register_buffer("freqs_cis", precompute_freqs_cis(args), persistent=False)
+        self.apply(self._init_weights)  # Correctly initialize weights
 
-    #changed
     def forward(self, tokens: torch.Tensor, start_pos: int = 0):
-        #print(f"Transformer Forward - Input tokens shape: {tokens.shape}, tokens dtype: {tokens.dtype}")  # Debug print
         seqlen = tokens.size(1)
         h = self.embed(tokens)
-        freqs_cis = self.freqs_cis[start_pos:start_pos+seqlen]
-        mask = None
-        if seqlen > 1:
-            mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device).triu_(1)
+        #freqs_cis = self.freqs_cis[start_pos:start_pos+seqlen] #comment for debugging
+        #mask = None
+        #if seqlen > 1:
+        #    mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device).triu_(1)
         for layer in self.layers:
-            h = layer(h, start_pos, freqs_cis, mask)
+            #h = layer(h, start_pos, freqs_cis, mask)
+             h = layer(h, start_pos, None, None) # Remove positional info for now
         h = self.norm(h)
-        logits = self.head(h) # Return *all* logits.
+        logits = self.head(h)
         if world_size > 1:
             all_logits = [torch.empty_like(logits) for _ in range(world_size)]
             dist.all_gather(all_logits, logits)
             logits = torch.cat(all_logits, dim=-1)
-        #print(f"Transformer Forward - Output logits shape: {logits.shape}, logits dtype: {logits.dtype}")
         return logits
 
     def get_parameter_count(self):
@@ -474,12 +456,34 @@ class Transformer(nn.Module):
             count += p.numel()
         return count
 
+
+    def _init_weights(self, module):
+        """
+        Initialize the weights using the same initialization of config file.
+        """
+        initializer_range = self.args.initializer_range
+        if isinstance(module, (Linear, ColumnParallelLinear, RowParallelLinear)):
+            # Linear layers: Use Kaiming initialization
+            torch.nn.init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+            if module.bias is not None:
+              fan_in, _ = nn.init._calculate_fan_in_and_fan_out(module.weight)
+              bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+              nn.init.uniform_(module.bias, -bound, bound)
+
+        elif isinstance(module, ParallelEmbedding):
+            # Embedding layer: Initialize with normal distribution
+            torch.nn.init.normal_(module.weight, mean=0.0, std=initializer_range)
+
+        elif isinstance(module, RMSNorm):
+            if hasattr(module, 'weight') and module.weight is not None:
+                nn.init.ones_(module.weight)
+
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
         for _ in range(max_new_tokens):
             idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, -self.max_seq_len:]
             logits = self(idx_cond)
-            logits = logits[:, -1, :] / temperature
+            logits = logits[:, -1, :] / temperature  # Only the last token's logits
             if top_k is not None:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < v[:, [-1]]] = -float('Inf')

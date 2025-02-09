@@ -108,6 +108,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path, trust_remote_code=True)
     # --- Create Model ---
     #model = AutoModelForCausalLM.from_config(config, trust_remote_code=True) # This does not load the weights!
+    print(f"bos_token_id: {tokenizer.bos_token_id}")
+    print(f"eos_token_id: {tokenizer.eos_token_id}")
+    print(f"pad_token_id: {tokenizer.pad_token_id}")
+    print(f"unk_token_id: {tokenizer.unk_token_id}")
 
     model = Transformer(model_args).to(device) #use our transfomer
 

@@ -12,7 +12,7 @@ from kernel import act_quant, weight_dequant, fp8_gemm
 
 world_size = 1
 rank = 0
-block_size = 128  # This will be overridden by the config, but it's good to have a default
+block_size = 128
 gemm_impl: Literal["bf16", "fp8"] = "bf16"
 attn_impl: Literal["naive", "absorb"] = "absorb"
 
@@ -63,7 +63,7 @@ class ParallelEmbedding(nn.Module):
         self.weight = nn.Parameter(torch.empty(self.part_vocab_size, self.dim, dtype=torch.bfloat16)) # Enforce bfloat16
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print(f"ParallelEmbedding - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug
+        #print(f"ParallelEmbedding - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug
         if world_size > 1:
             mask = (x < self.vocab_start_idx) | (x >= self.vocab_end_idx)
             x = x - self.vocab_start_idx
@@ -72,16 +72,16 @@ class ParallelEmbedding(nn.Module):
         if world_size > 1:
             y[mask] = 0
             dist.all_reduce(y)
-        print(f"ParallelEmbedding - Output y shape: {y.shape}, y dtype: {y.dtype}")  # Debug
+        #print(f"ParallelEmbedding - Output y shape: {y.shape}, y dtype: {y.dtype}")  # Debug
         return y
 
 
 
 def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] = None) -> torch.Tensor:
-    print(f"linear - Input x dtype: {x.dtype}, weight dtype: {weight.dtype}, bias dtype: {bias.dtype if bias is not None else None}")  # Debug print
+    #print(f"linear - Input x dtype: {x.dtype}, weight dtype: {weight.dtype}, bias dtype: {bias.dtype if bias is not None else None}")  # Debug print
     if weight.element_size() > 1:  # quantized
         out = F.linear(x, weight, bias)
-        print(f"linear - Output out dtype (weight.element_size() > 1): {out.dtype}")
+        #print(f"linear - Output out dtype (weight.element_size() > 1): {out.dtype}")
         return out
     elif gemm_impl == "bf16":
         # Only dequantize and convert to float32 if the weight is NOT already float32
@@ -96,7 +96,7 @@ def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] =
             bias = bias.to(torch.float32)
 
         out = F.linear(x, weight, bias)  # Now, x is bfloat16, weight is float32
-        print(f"linear - Output out dtype (gemm_impl == bf16): {out.dtype}") # Debug
+        #print(f"linear - Output out dtype (gemm_impl == bf16): {out.dtype}") # Debug
         return out
     else:  # gemm_impl == "fp8"
         x, scale = act_quant(x, block_size)
@@ -105,19 +105,18 @@ def linear(x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] =
             y += bias
         if y.dtype != torch.bfloat16:  # Keep consistent output dtype
           y = y.to(torch.bfloat16)
-        print(f"linear - Output y dtype (gemm_impl == fp8): {y.dtype}")
+        #print(f"linear - Output y dtype (gemm_impl == fp8): {y.dtype}")
         return y
 
 
 class Linear(nn.Module):
     dtype = torch.bfloat16  # Default dtype
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype=None):
+    def __init__(self, in_features: int, out_features: int, bias: bool = False, dtype = None):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        actual_dtype = dtype or Linear.dtype  # Use provided dtype or default
-        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=actual_dtype))
+        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=dtype or Linear.dtype))
         if self.weight.element_size() == 1:
             scale_out_features = (out_features + block_size - 1) // block_size
             scale_in_features = (in_features + block_size - 1) // block_size
@@ -125,7 +124,7 @@ class Linear(nn.Module):
         else:
             self.register_parameter("scale", None)
         if bias:
-            self.bias = nn.Parameter(torch.empty(out_features, dtype=actual_dtype))  # Enforce dtype
+            self.bias = nn.Parameter(torch.empty(out_features, dtype= actual_dtype))  # Enforce dtype
         else:
             self.register_parameter("bias", None)
         #print(f"Linear __init__ - Weight dtype: {self.weight.dtype}, Bias dtype: {self.bias.dtype if self.bias is not None else None}")
@@ -141,10 +140,10 @@ class ColumnParallelLinear(Linear):
         self.part_out_features = out_features // world_size
         # Crucially, we *force* the dtype here if it's the head.
         # This ensures the output of the head is float32.
-        if out_features == 102400: # Check the number of output features
-            super().__init__(in_features, self.part_out_features, bias, dtype=torch.float32) # Force float32 for head
-        else:
-            super().__init__(in_features, self.part_out_features, bias, dtype)
+        #if out_features == 102400: # Check the number of output features
+        #    super().__init__(in_features, self.part_out_features, bias, dtype=torch.float32) # Force float32 for head
+        #else:
+        super().__init__(in_features, self.part_out_features, bias, dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = linear(x, self.weight, self.bias)
@@ -173,7 +172,7 @@ class RMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(dim, dtype=torch.bfloat16))  # Enforce bfloat16
 
     def forward(self, x: torch.Tensor):
-        print(f"RMSNorm - Input x shape: {x.shape}, x dtype: {x.dtype}, weight dtype: {self.weight.dtype}")  # Debug print
+        #print(f"RMSNorm - Input x shape: {x.shape}, x dtype: {x.dtype}, weight dtype: {self.weight.dtype}")  # Debug print
         return F.rms_norm(x, (self.dim,), self.weight, self.eps)
 
 
@@ -269,7 +268,7 @@ class MLA(nn.Module):
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
         bsz, seqlen, _ = x.size()
         end_pos = start_pos + seqlen
-        print(f"MLA Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"MLA Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         if self.q_lora_rank == 0:
             q = self.wq(x)
         else:
@@ -306,7 +305,7 @@ class MLA(nn.Module):
             x = torch.einsum("bsht,btc->bshc", scores, self.kv_cache[:bsz, :end_pos])
             x = torch.einsum("bshc,hdc->bshd", x, wkv_b[:, -self.v_head_dim:])
         x = self.wo(x.flatten(2))
-        print(f"MLA Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"MLA Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         return x
 
 
@@ -318,9 +317,9 @@ class MLP(nn.Module):
         self.w3 = ColumnParallelLinear(dim, inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print(f"MLP Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"MLP Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         out = self.w2(F.silu(self.w1(x)) * self.w3(x))
-        print(f"MLP Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+        #print(f"MLP Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
         return out
 
 
@@ -339,7 +338,7 @@ class Gate(nn.Module):
         self.bias = nn.Parameter(torch.empty(args.n_routed_experts, dtype=torch.bfloat16)) if self.dim == 7168 else None # Enforce bfloat16
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        print(f"Gate Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")
+        #print(f"Gate Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")
         scores = linear(x, self.weight)
         if self.score_func == "softmax":
             scores = scores.softmax(dim=-1, dtype=torch.float32)
@@ -373,9 +372,9 @@ class Expert(nn.Module):
         self.w3 = Linear(dim, inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print(f"Expert Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"Expert Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         out = self.w2(F.silu(self.w1(x)) * self.w3(x))
-        print(f"Expert Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+        #print(f"Expert Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
         return out
 
 class MoE(nn.Module):
@@ -395,7 +394,7 @@ class MoE(nn.Module):
         self.shared_experts = MLP(args.dim, args.n_shared_experts * args.moe_inter_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print(f"MoE Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"MoE Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         shape = x.size()
         x = x.view(-1, self.dim)
         weights, indices = self.gate(x)
@@ -411,7 +410,7 @@ class MoE(nn.Module):
         if world_size > 1:
             dist.all_reduce(y)
         out = (y + z).view(shape)
-        print(f"MoE Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
+        #print(f"MoE Forward - Output x shape: {out.shape}, x dtype: {out.dtype}")  # Debug print
 
         return out
 
@@ -420,16 +419,16 @@ class Block(nn.Module):
     def __init__(self, layer_id: int, args: ModelArgs):
         super().__init__()
         self.attn = MLA(args) if args.q_lora_rank > 0 or args.kv_lora_rank > 0 else None
-        self.ffn = MLP(args.dim, args.inter_dim) if layer_id < args.n_dense_layers else None
+        self.ffn = MLP(args.dim, args.inter_dim) if layer_id < args.n_dense_layers else MoE(args)
         self.attn_norm = RMSNorm(args.dim) if self.attn is not None else None
         self.ffn_norm = RMSNorm(args.dim)
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
-        print(f"Block Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"Block Forward - Input x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         if self.attn is not None:
           x = x + self.attn(self.attn_norm(x), start_pos, freqs_cis, mask)
         x = x + self.ffn(self.ffn_norm(x))
-        print(f"Block Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
+        #print(f"Block Forward - Output x shape: {x.shape}, x dtype: {x.dtype}")  # Debug print
         return x
 
 
@@ -446,11 +445,12 @@ class Transformer(nn.Module):
         for layer_id in range(args.n_layers):
             self.layers.append(Block(layer_id, args))
         self.norm = RMSNorm(args.dim)
-        self.head = ColumnParallelLinear(args.dim, args.vocab_size, dtype=torch.float32) #Initialise with float32
+        self.head = ColumnParallelLinear(args.dim, args.vocab_size) #Initialise with bfloat16 (the same a embed)
         self.register_buffer("freqs_cis", precompute_freqs_cis(args), persistent=False)
 
+    #changed
     def forward(self, tokens: torch.Tensor, start_pos: int = 0):
-        print(f"Transformer Forward - Input tokens shape: {tokens.shape}, tokens dtype: {tokens.dtype}")  # Debug print
+        #print(f"Transformer Forward - Input tokens shape: {tokens.shape}, tokens dtype: {tokens.dtype}")  # Debug print
         seqlen = tokens.size(1)
         h = self.embed(tokens)
         freqs_cis = self.freqs_cis[start_pos:start_pos+seqlen]
@@ -459,13 +459,13 @@ class Transformer(nn.Module):
             mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device).triu_(1)
         for layer in self.layers:
             h = layer(h, start_pos, freqs_cis, mask)
-        h = self.norm(h) # Don't select last token here.
+        h = self.norm(h)
         logits = self.head(h) # Return *all* logits.
         if world_size > 1:
             all_logits = [torch.empty_like(logits) for _ in range(world_size)]
             dist.all_gather(all_logits, logits)
             logits = torch.cat(all_logits, dim=-1)
-        print(f"Transformer Forward - Output logits shape: {logits.shape}, logits dtype: {logits.dtype}")
+        #print(f"Transformer Forward - Output logits shape: {logits.shape}, logits dtype: {logits.dtype}")
         return logits
 
     def get_parameter_count(self):

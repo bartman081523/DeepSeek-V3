@@ -75,9 +75,10 @@ def estimate_loss(model, ctx, eval_iters, train_data, val_data):
         for k in range(eval_iters):
             X, Y = get_batch(split, train_data, val_data)
             with ctx:
-                logits = model(X)
-                logits = logits.view(-1, logits.size(-1))
-                Y = Y.view(-1)
+                logits = model(X) # logits will have shape (batch_size, seq_len, vocab_size)
+                B, T, C = logits.shape
+                logits = logits.view(B*T, C) # Reshape for cross_entropy
+                Y = Y.view(B*T)  # Flatten Y to match
                 loss = torch.nn.functional.cross_entropy(logits, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
@@ -260,7 +261,7 @@ if __name__ == '__main__':
                 logits = model(X)
                 logits = logits.view(-1, logits.size(-1))
                 Y_flat = Y.view(-1)
-                logits = logits.to(torch.float32)  # Cast logits to float32
+                #logits = logits.to(torch.float32)  # Cast logits to float32 # No need for casting, the linear layer is doing it fine.
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
             scaled_loss = scaler.scale(loss) # Scale

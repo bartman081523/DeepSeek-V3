@@ -4,7 +4,7 @@ import time
 import math
 import json  # Import the json module
 from contextlib import nullcontext
-
+import shutil
 import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -12,8 +12,9 @@ from torch.distributed import init_process_group, destroy_process_group
 
 # --- Import model and ModelArgs ---
 from model import Transformer, ModelArgs
-import importlib  # Used for loading config
-
+# No need for importlib, we are going to use the config.json file.
+#import importlib  # Used for loading config #REMOVED
+from transformers import AutoConfig #we load a config to get the model arguments
 
 # --- Configuration ---
 out_dir = 'out-deepseek'
@@ -63,8 +64,6 @@ def get_batch(split, train_data, val_data):
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     x, y = x.to(device), y.to(device)
-    #print(f"get_batch - x shape: {x.shape}, x dtype: {x.dtype}, x device: {x.device}")  # Debug print
-    #print(f"get_batch - y shape: {y.shape}, y dtype: {y.dtype}, y device: {y.device}")  # Debug print
     return x, y
 
 @torch.no_grad()
@@ -134,25 +133,59 @@ if __name__ == '__main__':
     val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')    # Load int64
 
 
-    # --- Load Configuration from Command Line ---
+   # --- Load Configuration from Command Line ---
     if len(sys.argv) < 2:
-        print("Usage: python train.py <config_file>")
+        print("Usage: python train.py <config_file>") #e.g. configs/10m.json
         sys.exit(1)
-    config_file = sys.argv[1]  # Get config file path from command line
-    config_name = os.path.splitext(os.path.basename(config_file))[0]  # Extract config name
-    config_module = importlib.import_module(f"configs.{config_name}")
-    model_args = config_module.model_args  # Access ModelArgs
+    config_file = sys.argv[1]  # Get config file path from command line, should be 10m.json
 
-     # Convert ModelArgs to a dictionary and add model_type
-    model_args_dict = model_args.__dict__
-    model_args_dict['model_type'] = 'deepseek_v3'  # Add model_type
+    # --- Load Model Args (from 10m.json) ---
+    try:
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+            model_args = ModelArgs(**config['model_args']) # Get args from the 'model_args' dictionary
+    except FileNotFoundError:
+        print(f"Error: Config file not found at {config_file}")
+        exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error: {config_file} is not a valid JSON file or is missing 'model_args': {e}")
+        exit(1)
 
-    # Save the configuration as JSON
+    # Create a config dictionary in the format that Hugging Face expects.  This is
+    # what will get saved as config.json.  We *combine* information from
+    # your 10m.json *and* from the example config.json you provided.
+
+    config_dict = {
+        "architectures": [
+          "DeepseekV3ForCausalLM"
+        ],
+        "attention_bias": False,
+        "attention_dropout": 0.0,
+        "auto_map": {
+          "AutoConfig": "configuration_deepseek.DeepseekV3Config",
+          "AutoModel": "modeling_deepseek.DeepseekV3Model",  #<-- You will need to create this.
+          "AutoModelForCausalLM": "modeling_deepseek.DeepseekV3ForCausalLM" #<--- and this.
+        },
+        # All your model parameters from 10m.json:
+        **config['model_args'],  # Add all the parameters from model_args
+        "model_type": "deepseek_v3",  # VERY IMPORTANT: This must match your config class name.
+    }
+
+
+    # Save the *complete* configuration as config.json
     config_json_path = os.path.join(out_dir, 'config.json')
     if master_process:  # Only save from the master process
        with open(config_json_path, 'w') as f:
-           json.dump(model_args_dict, f, indent=4)
-       print(f"Saved model configuration to {config_json_path}")
+           json.dump(config_dict, f, indent=4) #save config dict and not model_args_dict
+       print(f"Saved Hugging Face compatible config to {config_json_path}")
+
+        # Copy the configuration_deepseek.py file to the output directory
+       try:
+           shutil.copy("configs/configuration_deepseek.py", out_dir) #copy file
+           print("configuration_deepseek.py copied to checkpoint directory.")
+       except FileNotFoundError:
+            print("Error: configuration_deepseek.py not found.  Make sure it exists.")
+            exit(1)
 
 
     # --- Model Initialization ---
@@ -204,10 +237,10 @@ if __name__ == '__main__':
                 checkpoint = {
                     'model': model.module.state_dict() if ddp else model.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'model_args': model_args_dict,  # Save ModelArgs as a dict
+                    'model_args': model_args.__dict__,  # Save ModelArgs as a dict
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
-                    'config': {},  # You might want to populate this
+                    'config': config_dict, #save the config dict
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
@@ -230,17 +263,6 @@ if __name__ == '__main__':
                 logits = logits.to(torch.float32)  # Cast logits to float32
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
-
-                # --- Debug Prints ---
-                #print(f"Micro-step: {micro_step}")
-                #print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
-                #print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
-                #print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
-                #if torch.cuda.is_available():
-                #    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
-                #    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
-                #    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
-                # ----------------------
             scaled_loss = scaler.scale(loss) # Scale
             if accumulated_loss is None:
                 accumulated_loss = scaled_loss

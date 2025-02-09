@@ -1,14 +1,24 @@
 {
-    "max_batch_size": 8,
-    "max_seq_len": 1024,
-    "dtype": "bfloat16",
-    "vocab_size": 102400,
-    "dim": 64,
-    "inter_dim": 256,
-    "moe_inter_dim": 1408,
+    "architectures": [
+        "DeepseekV3ForCausalLM"
+    ],
+    "attention_bias": false,
+    "attention_dropout": 0.0,
+    "auto_map": {
+        "AutoConfig": "configuration_deepseek.DeepseekV3Config",
+        "AutoModel": "modeling_deepseek.DeepseekV3Model",
+        "AutoModelForCausalLM": "modeling_deepseek.DeepseekV3ForCausalLM"
+    },
     "n_layers": 2,
     "n_dense_layers": 2,
     "n_heads": 4,
+    "dim": 64,
+    "inter_dim": 256,
+    "vocab_size": 102400,
+    "max_seq_len": 1024,
+    "qk_nope_head_dim": 16,
+    "qk_rope_head_dim": 16,
+    "v_head_dim": 16,
     "n_routed_experts": 0,
     "n_shared_experts": 0,
     "n_activated_experts": 0,
@@ -18,14 +28,13 @@
     "route_scale": 1.0,
     "q_lora_rank": 0,
     "kv_lora_rank": 0,
-    "qk_nope_head_dim": 16,
-    "qk_rope_head_dim": 16,
-    "v_head_dim": 16,
     "original_seq_len": 4096,
     "rope_theta": 10000.0,
     "rope_factor": 1.0,
     "beta_fast": 32,
     "beta_slow": 1,
     "mscale": 1.0,
+    "dtype": "bfloat16",
+    "max_batch_size": 8,
     "model_type": "deepseek_v3"
 }

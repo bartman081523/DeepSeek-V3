@@ -10,9 +10,8 @@ This format ensures a clear and orderly presentation of both the structure and t
 Directory/File Tree Begins -->
 
 /
-├── __pycache__
 ├── configs
-├── configuration_deepseek.py
+│   ├── configuration_deepseek.py
 ├── kernel.py
 ├── model.py
 ├── sample.py
@@ -21,7 +20,7 @@ Directory/File Tree Begins -->
 <-- Directory/File Tree Ends
 
 File Content Begin -->
-[File Begins] configuration_deepseek.py
+[File Begins] configs/configuration_deepseek.py
 from transformers.configuration_utils import PretrainedConfig
 from transformers.utils import logging
 
@@ -232,7 +231,7 @@ class DeepseekV3Config(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
-[File Ends] configuration_deepseek.py
+[File Ends] configs/configuration_deepseek.py
 
 [File Begins] kernel.py
 from typing import Tuple
@@ -926,11 +925,12 @@ class Transformer(nn.Module):
 import os
 import torch
 import torch.distributed as dist
-from transformers import AutoTokenizer, AutoConfig  # Import AutoConfig
-from model import Transformer, ModelArgs
+from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
+from model import Transformer, ModelArgs  # Keep this for now
 from argparse import ArgumentParser
 from typing import List, Optional
 import json
+
 
 def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
     """Samples a token from the logits using temperature scaling and top-k filtering."""
@@ -941,59 +941,49 @@ def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
     probs = torch.softmax(logits, dim=-1)
     return torch.multinomial(probs, num_samples=1)
 
+
 @torch.inference_mode()
-def generate(model: Transformer, prompt_tokens: List[List[int]], max_new_tokens: int, eos_id: int, temperature: float = 1.0, top_k: Optional[int] = None) -> List[List[int]]:
-    prompt_lens = [len(t) for t in prompt_tokens]
-    assert max(prompt_lens) <= model.max_seq_len, f"Prompt length exceeds model maximum sequence length (max_seq_len={model.max_seq_len})"
-    total_len = min(model.max_seq_len, max_new_tokens + max(prompt_lens))
-    tokens = torch.full((len(prompt_tokens), total_len), -1, dtype=torch.long, device="cuda")
-    for i, t in enumerate(prompt_tokens):
-        tokens[i, :len(t)] = torch.tensor(t, dtype=torch.long, device="cuda")
+def generate(model, prompt_tokens, max_new_tokens, eos_id, temperature=1.0, top_k=None):
+    """Generates new tokens, adapted from original generate.py."""
+    prompt_len = len(prompt_tokens)
+    if prompt_len > model.max_seq_len:
+        prompt_tokens = prompt_tokens[-model.max_seq_len:]  # Truncate prompt if needed
+    total_len = min(model.max_seq_len, max_new_tokens + prompt_len)
+    tokens = torch.full((1, total_len), eos_id, dtype=torch.long, device=model.device)  # Initialize with eos_token_id
+    tokens[0, :len(prompt_tokens)] = torch.tensor(prompt_tokens, dtype=torch.long, device=model.device)
     prev_pos = 0
-    finished = torch.tensor([False] * len(prompt_tokens), device="cuda")
-    prompt_mask = tokens != -1
-
-    for cur_pos in range(min(prompt_lens), total_len):
-        logits = model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
-        next_token = sample(logits[:, -1, :], temperature, top_k) #sample from last token
-        next_token = torch.where(prompt_mask[:, cur_pos], tokens[:, cur_pos], next_token)
+    for cur_pos in range(prompt_len, total_len):
+        logits = model(tokens[:, prev_pos:cur_pos], prev_pos)
+        next_token = sample(logits[:, -1, :], temperature, top_k)
         tokens[:, cur_pos] = next_token
-        finished |= torch.logical_and(~prompt_mask[:, cur_pos], next_token == eos_id)
-        prev_pos = cur_pos
-        if finished.all():
+        if next_token == eos_id:
             break
+        prev_pos = cur_pos
+    return tokens[0, prompt_len:cur_pos + 1].tolist()
 
-    completion_tokens = []
-    for i, toks in enumerate(tokens.tolist()):
-        toks = toks[prompt_lens[i]:prompt_lens[i]+max_new_tokens]
-        if eos_id in toks:
-            toks = toks[:toks.index(eos_id)]
-        completion_tokens.append(toks)
-    return completion_tokens
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--ckpt-path", type=str, required=True, help="Path to the checkpoint directory")
-    parser.add_argument("--config", type=str, required=True, help="Path to the model configuration file (10m.json)")  # Now expects 10m.json
+    # No need for --config, it's in ckpt-path now
     parser.add_argument("--prompt", type=str, default="", help="Initial prompt for text generation")
-    parser.add_argument("--max-new-tokens", type=int, default=100, help="Maximum number of tokens to generate")
+    parser.add_argument("--max-new-tokens", type=int, default=200, help="Maximum number of tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.8, help="Temperature for sampling")
     parser.add_argument("--top-k", type=int, default=None, help="Top-k sampling parameter")
     parser.add_argument("--seed", type=int, default=1337, help="Random seed for reproducibility")
     parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
     args = parser.parse_args()
 
-
     # --- Setup: Seeding, Device, and Distributed ---
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
-      device = 'cuda'
-      torch.cuda.manual_seed_all(args.seed)  # For multi-GPU
+        device = 'cuda'
+        torch.cuda.manual_seed_all(args.seed)  # For multi-GPU
     else:
-       device = 'cpu'
-       print("No CUDA, using CPU")
+        device = 'cpu'
+        print("No CUDA, using CPU")
 
-     # Handle distributed setup (if applicable)
+    # Handle distributed setup (if applicable)
     if 'RANK' in os.environ:
         dist.init_process_group(backend="nccl")
         rank = dist.get_rank()
@@ -1005,34 +995,18 @@ def main():
         rank = 0
         world_size = 1
 
-    # --- Load Model Args (from 10m.json) ---
-    try:
-        with open(args.config, 'r') as f:
-            config = json.load(f)
-            model_args = ModelArgs(**config['model_args']) # Get args from the 'model_args' dictionary
-    except FileNotFoundError:
-        print(f"Error: Config file not found at {args.config}")
-        exit(1)
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"Error: {args.config} is not a valid JSON file or is missing 'model_args': {e}")
-        exit(1)
+    # --- Load Configuration and Tokenizer with trust_remote_code ---
+    config = AutoConfig.from_pretrained(args.ckpt_path, trust_remote_code=True)  # Load config
+    tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path, trust_remote_code=True)
 
 
-    # --- Load Tokenizer ---
-    try:
-        # First, try loading directly from ckpt_path.  This is the *correct* way,
-        # IF the tokenizer files are present.
-        tokenizer = AutoTokenizer.from_pretrained(args.ckpt_path)
-    except (OSError, EnvironmentError) as e:
-        print(f"Failed to load tokenizer from checkpoint path: {e}")
-        print("CRITICAL ERROR: Cannot proceed without the correct tokenizer.")
-        exit(1)  # Exit, as we can't recover without the tokenizer.
+    # --- Create Model (using AutoModelForCausalLM) ---
+    # Now that the files are set, we should create a new class DeepseekV3ForCausalLM.
+    # This way the loading could be done with AutoModelForCausalLM instead of calling our implementation
+    #model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+    model = Transformer(config).to(device) #keep our Transformer
 
-    # --- Create Model ---
-    model = Transformer(model_args).to(device)
-
-
-     # --- Load Model Weights (Corrected for distributed setup) ---
+    # --- Load Model Weights ---
     if world_size > 1:
        # Load the sharded checkpoint for the current process
        model_file = os.path.join(args.ckpt_path, f"model{rank}-mp{world_size}.safetensors")
@@ -1050,7 +1024,7 @@ def main():
        else:
           model.load_state_dict(checkpoint)
 
-    model.eval()  # Set the model to evaluation mode
+    model.eval()  # Ensure the model is in evaluation mode
 
    # --- Prepare Prompt ---
     if args.interactive:
@@ -1073,8 +1047,8 @@ def main():
                 continue
             messages.append({"role": "user", "content": prompt})
             prompt_tokens = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-            completion_tokens = generate(model, [prompt_tokens], args.max_new_tokens, tokenizer.eos_token_id, args.temperature, args.top_k)
-            completion = tokenizer.decode(completion_tokens[0]) #, skip_special_tokens=True) Remove skip special tokens, it may cause problems
+            completion_tokens = generate(model, prompt_tokens, args.max_new_tokens, tokenizer.eos_token_id, args.temperature, args.top_k)
+            completion = tokenizer.decode(completion_tokens) #, skip_special_tokens=True) Remove skip special tokens, it may cause problems
             print(completion)
             messages.append({"role": "assistant", "content": completion})
     else:
@@ -1092,7 +1066,6 @@ def main():
             print(tokenizer.decode(y[0].tolist())) #before this was missing
             print("---------------")
 
-
 if __name__ == "__main__":
     main()
 
@@ -1105,7 +1078,7 @@ import time
 import math
 import json  # Import the json module
 from contextlib import nullcontext
-
+import shutil
 import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -1113,8 +1086,9 @@ from torch.distributed import init_process_group, destroy_process_group
 
 # --- Import model and ModelArgs ---
 from model import Transformer, ModelArgs
-import importlib  # Used for loading config
-
+# No need for importlib, we are going to use the config.json file.
+#import importlib  # Used for loading config #REMOVED
+from transformers import AutoConfig #we load a config to get the model arguments
 
 # --- Configuration ---
 out_dir = 'out-deepseek'
@@ -1164,8 +1138,6 @@ def get_batch(split, train_data, val_data):
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     x, y = x.to(device), y.to(device)
-    #print(f"get_batch - x shape: {x.shape}, x dtype: {x.dtype}, x device: {x.device}")  # Debug print
-    #print(f"get_batch - y shape: {y.shape}, y dtype: {y.dtype}, y device: {y.device}")  # Debug print
     return x, y
 
 @torch.no_grad()
@@ -1235,25 +1207,59 @@ if __name__ == '__main__':
     val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.int64, mode='r')    # Load int64
 
 
-    # --- Load Configuration from Command Line ---
+   # --- Load Configuration from Command Line ---
     if len(sys.argv) < 2:
-        print("Usage: python train.py <config_file>")
+        print("Usage: python train.py <config_file>") #e.g. configs/10m.json
         sys.exit(1)
-    config_file = sys.argv[1]  # Get config file path from command line
-    config_name = os.path.splitext(os.path.basename(config_file))[0]  # Extract config name
-    config_module = importlib.import_module(f"configs.{config_name}")
-    model_args = config_module.model_args  # Access ModelArgs
+    config_file = sys.argv[1]  # Get config file path from command line, should be 10m.json
 
-     # Convert ModelArgs to a dictionary and add model_type
-    model_args_dict = model_args.__dict__
-    model_args_dict['model_type'] = 'deepseek_v3'  # Add model_type
+    # --- Load Model Args (from 10m.json) ---
+    try:
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+            model_args = ModelArgs(**config['model_args']) # Get args from the 'model_args' dictionary
+    except FileNotFoundError:
+        print(f"Error: Config file not found at {config_file}")
+        exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error: {config_file} is not a valid JSON file or is missing 'model_args': {e}")
+        exit(1)
 
-    # Save the configuration as JSON
+    # Create a config dictionary in the format that Hugging Face expects.  This is
+    # what will get saved as config.json.  We *combine* information from
+    # your 10m.json *and* from the example config.json you provided.
+
+    config_dict = {
+        "architectures": [
+          "DeepseekV3ForCausalLM"
+        ],
+        "attention_bias": False,
+        "attention_dropout": 0.0,
+        "auto_map": {
+          "AutoConfig": "configuration_deepseek.DeepseekV3Config",
+          "AutoModel": "modeling_deepseek.DeepseekV3Model",  #<-- You will need to create this.
+          "AutoModelForCausalLM": "modeling_deepseek.DeepseekV3ForCausalLM" #<--- and this.
+        },
+        # All your model parameters from 10m.json:
+        **config['model_args'],  # Add all the parameters from model_args
+        "model_type": "deepseek_v3",  # VERY IMPORTANT: This must match your config class name.
+    }
+
+
+    # Save the *complete* configuration as config.json
     config_json_path = os.path.join(out_dir, 'config.json')
     if master_process:  # Only save from the master process
        with open(config_json_path, 'w') as f:
-           json.dump(model_args_dict, f, indent=4)
-       print(f"Saved model configuration to {config_json_path}")
+           json.dump(config_dict, f, indent=4) #save config dict and not model_args_dict
+       print(f"Saved Hugging Face compatible config to {config_json_path}")
+
+        # Copy the configuration_deepseek.py file to the output directory
+       try:
+           shutil.copy("configs/configuration_deepseek.py", out_dir) #copy file
+           print("configuration_deepseek.py copied to checkpoint directory.")
+       except FileNotFoundError:
+            print("Error: configuration_deepseek.py not found.  Make sure it exists.")
+            exit(1)
 
 
     # --- Model Initialization ---
@@ -1305,10 +1311,10 @@ if __name__ == '__main__':
                 checkpoint = {
                     'model': model.module.state_dict() if ddp else model.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'model_args': model_args_dict,  # Save ModelArgs as a dict
+                    'model_args': model_args.__dict__,  # Save ModelArgs as a dict
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
-                    'config': {},  # You might want to populate this
+                    'config': config_dict, #save the config dict
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
@@ -1331,17 +1337,6 @@ if __name__ == '__main__':
                 logits = logits.to(torch.float32)  # Cast logits to float32
                 loss = torch.nn.functional.cross_entropy(logits, Y_flat)
                 loss = loss / gradient_accumulation_steps  # scale the loss *before* accumulating
-
-                # --- Debug Prints ---
-                #print(f"Micro-step: {micro_step}")
-                #print(f"  Logits shape: {logits.shape}, dtype: {logits.dtype}, requires_grad: {logits.requires_grad}")
-                #print(f"  Y_flat shape: {Y_flat.shape}, dtype: {Y_flat.dtype}, requires_grad: {Y_flat.requires_grad}")
-                #print(f"  Loss: {loss.item()}, dtype: {loss.dtype}, requires_grad: {loss.requires_grad}")
-                #if torch.cuda.is_available():
-                #    print(f"  CUDA memory allocated: {torch.cuda.memory_allocated(device) / (1024**3):.2f} GB")
-                #    print(f"  CUDA memory reserved: {torch.cuda.memory_reserved(device) / (1024**3):.2f} GB")
-                #    print(f"  Max CUDA memory allocated: {torch.cuda.max_memory_allocated(device) / (1024**3):.2f} GB")
-                # ----------------------
             scaled_loss = scaler.scale(loss) # Scale
             if accumulated_loss is None:
                 accumulated_loss = scaled_loss
